@@ -12,7 +12,7 @@ import sys
 import json
 from ui_installer.lib.click import pause
 from ruamel.yaml import CommentedMap, CommentedSeq
-
+from openpyxl import *
 
 from fire.formatting import Bold
 
@@ -387,6 +387,311 @@ def repo_info(root_src, folder):
                         changes = f'{changes}, {k}:{v}'
                 return f'({_colorize_green(detail)}) {changes}'
     return f'{_colorize("no data", color="yellow", attrs=["bold"])}'
+
+#region localization helper.
+#region work with excel.
+def create_not_localized_worksheet(workbook):
+    """Создать лист для выгрузки нелокализованных строк."""
+    worksheet = workbook.active
+    worksheet.title = "Не локализовано"
+    worksheet.column_dimensions['A'].width = 40
+    worksheet['A1'] = "Сущность"
+    worksheet.column_dimensions['B'].width = 40
+    worksheet['B1'] = "Имя ресурса"
+    worksheet.column_dimensions['C'].width = 80
+    worksheet['C1'] = "Русский текст ресурса"
+    worksheet.column_dimensions['D'].width = 80
+    worksheet['D1'] = "Английский текст ресурса"
+    worksheet.column_dimensions['E'].width = 60
+    worksheet['E1'] = "Использование"
+    worksheet.column_dimensions['F'].width = 40
+    worksheet['F1'] = "Исправленное имя ресурса"
+    worksheet.column_dimensions['G'].width = 80
+    worksheet['G1'] = "Исправленный русский текст"
+    worksheet.column_dimensions['H'].width = 80
+    worksheet['H1'] = "Исправленный английский текст"
+    worksheet.column_dimensions['I'].width = 80
+    worksheet['I1'] = "Примечание"
+    worksheet.column_dimensions['J'].width = 80
+    worksheet['J1'] = "Вопрос"
+    worksheet.column_dimensions['K'].width = 80
+    worksheet['K1'] = "Ответ"
+    header = worksheet['A1:K1']
+    add_style_to_header(header)
+    return worksheet
+
+def create_not_used_worksheet(workbook):
+    """Создать лист для выгрузки неиспользуемых строк."""
+    worksheet = workbook.create_sheet()
+    worksheet.title = "Не используется"
+    worksheet.column_dimensions['A'].width = 40
+    worksheet['A1'] = "Сущность"
+    worksheet.column_dimensions['B'].width = 40
+    worksheet['B1'] = "Имя ресурса"
+    worksheet.column_dimensions['C'].width = 80
+    worksheet['C1'] = "Русский текст ресурса"
+    worksheet.column_dimensions['D'].width = 80
+    worksheet['D1'] = "Английский текст ресурса"
+    header = worksheet['A1:D1']
+    add_style_to_header(header)
+    return worksheet
+
+def add_style_to_header(range):
+    """Применить форматирование заголовков для заданной области."""
+    from openpyxl.styles import PatternFill, Alignment, Font
+    for row in range:
+        for cell in row:
+            cell.fill = PatternFill("solid", fgColor="CCCCCC")
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center",
+                                       vertical="center")
+
+def add_style_to_range(range):
+    """Применить форматирование для заданной области."""
+    from openpyxl.styles import Alignment
+    for row in range:
+        for cell in row:
+            cell.alignment = Alignment(horizontal='general',
+                                       vertical='top',
+                                       wrap_text=True)
+#endregion
+
+#region work with files and folders.
+def find_all_mtd_files(src_folder):
+    """Получить все mtd-файлы из заданной папки.
+    Исключить файлы из папок VersionData, так как для них не будет файлов с ресурсами."""
+    import glob
+    all_mtd_files = glob.glob(src_folder + "\\**\\*.mtd", recursive=True)
+    all_mtd_files = list(filter(lambda x: x.lower().find("versiondata") == -1, all_mtd_files))
+    return all_mtd_files
+
+def find_all_xml_files(src_folder):
+    """Получить все xml-файлы из заданной папки.
+    Взять только те, где есть раздел localizedStringValues, так как только в них содержатся ресурсы."""
+    import glob
+    import xmltodict
+    all_xml_files = glob.glob(src_folder + "\\**\\*.xml", recursive=True)
+    resources_files = []
+    for filename in all_xml_files:
+        import codecs
+        with codecs.open(filename, "r", "utf_8_sig") as f:
+            text = f.read()
+            try:
+                xml_data = xmltodict.parse(text)
+                xml_data['localizedStringValues']
+            except:
+                pass
+            else:
+                resources_files.append(filename)
+    return resources_files
+
+def get_filename_without_ext(filename):
+    """Получить имя файла без расширения."""
+    return os.path.splitext(filename)[0]
+
+def get_file_path(filename):
+    """Получить путь до файла."""
+    return os.path.dirname(os.path.dirname(filename))
+
+def get_filename_without_ext_and_src_folder(filename):
+    """Получить имя файла без пути и расширения."""
+    return os.path.basename(get_filename_without_ext(filename))
+
+def get_resource_filename_by_mtd_filename(filename, is_system, is_russian):
+    """Получить имя файла с ресурсами по имени mtd-файла и параметрам: русские/английские, системыне/несистемные."""
+    resource_filename = get_filename_without_ext(filename)
+    if is_system:
+        resource_filename += "System"
+    if is_russian:
+        resource_filename += ".ru"
+    resource_filename += ".resx"
+    if os.path.exists(resource_filename):
+        return resource_filename
+    else:
+        return None
+
+def get_output_excel_filename(output_folder):
+    """Получить уникальное имя файла в указанной папке для выгрузки ресурсов."""
+    from datetime import datetime
+    os.makedirs(output_folder, exist_ok=True)
+    output_filename = output_folder
+    if not output_filename.endswith("\\"):
+        output_filename += "\\"
+    output_filename += f'DirectumRX. Экспорт строк локализации. {str(datetime.now()).replace(":", "_")}.xlsx'
+    return output_filename
+#endregion
+
+#region work with resources.
+def find_all_resources(filename):
+    """Получить ресурсы из указанного файла прикладной."""
+    import xmltodict
+    import codecs
+    with codecs.open(filename, "r", "utf_8_sig") as f:
+        text = f.read()
+        xml_data = xmltodict.parse(text)
+        try:
+            resources_list = xml_data['root']['data']
+        except:
+            return []
+        else:
+            return resources_list
+
+def find_all_ess_resources(filename):
+    """Получить ресурсы из указанного файла конфигов ЛК."""
+    import xmltodict
+    import codecs
+    with codecs.open(filename, "r", "utf_8_sig") as f:
+        text = f.read()
+        xml_data = xmltodict.parse(text)
+        try:
+            resources_list = xml_data['localizedStringValues']['localizedStringValue']
+        except:
+            return []
+        else:
+            return resources_list
+
+def find_resource_in_file_by_name(filename, resource_name):
+    import xmltodict
+    import codecs
+    """Найти ресурс в файле по указанному имени."""
+    with codecs.open(filename, "r", "utf_8_sig") as f:
+        text = f.read()
+        xml_data = xmltodict.parse(text)
+        try:
+            resources_list = xml_data['root']['data']
+        except:
+            return None
+        else:
+            # Если строка единственная - вместо списка словарей вернется словарь,
+            # завернуть в список из одного элемента, иначе упадет на фильтрации.
+            if not isinstance(resources_list, list):
+                resources_list = [resources_list]
+            resource = list(filter(lambda x: x['@name'] == resource_name, resources_list))
+            if len(resource) >= 1:
+                return resource[0]
+    return None
+
+def get_resources_list_from_file(mtd_filename, is_system):
+    """Получить все ресурсы по mtd-файлу: системные или несистемные."""
+    resources_list = []
+    en_resources_filename = get_resource_filename_by_mtd_filename(mtd_filename, is_system, False)
+    ru_resources_filename = get_resource_filename_by_mtd_filename(mtd_filename, is_system, True)
+    if en_resources_filename is not None and ru_resources_filename is not None:
+        # Сначала найти английские строки.
+        en_resources_list = find_all_resources(en_resources_filename)
+        # Если строка единственная - вместо списка словарей вернется словарь,
+        # завернуть в список из одного элемента, иначе упадет на получении данных ресурса.
+        if not isinstance(en_resources_list, list):
+            en_resources_list = [en_resources_list]
+        for en_resource in en_resources_list:
+            resource_name = en_resource['@name']
+            en_resource_value = en_resource['value']
+            # Файл с ресурсом лежит в папке, совпадающей с именем компоненты.
+            # Исключение - Module.resx, для него необходимо взять имя папки решения.
+            splited_path = mtd_filename.split("\\")
+            if get_filename_without_ext_and_src_folder(mtd_filename) == 'Module':
+                component_name = splited_path[len(splited_path) - 3]
+            else:
+                component_name = splited_path[len(splited_path) - 2]
+            if en_resource_value is not None:
+                # По имени английской строки получить русскую.
+                ru_resource = find_resource_in_file_by_name(ru_resources_filename, resource_name)
+                if ru_resource is not None:
+                    line = [mtd_filename,
+                            component_name,
+                            resource_name,
+                            ru_resource['value'],
+                            en_resource_value,
+                            is_system,
+                            'TODO поиск']
+                    resources_list.append(line)
+    return resources_list
+
+def get_resources_list_from_mtd_file(mtd_filename):
+    """Получить все ресурсы по mtd-файлу: системные и несистемные."""
+    resources_list = get_resources_list_from_file(mtd_filename, False)
+    system_resources_list = get_resources_list_from_file(mtd_filename, True)
+    resources_list.extend(system_resources_list)
+    return resources_list
+
+def get_resources_list_from_xml_file(xml_filename):
+    """Получить ресурсы из конфига ЛК."""
+    resources_list = []
+    all_resources_list = find_all_ess_resources(xml_filename)
+    # Если строка единственная - вместо списка словарей вернется словарь,
+    # завернуть в список из одного элемента, иначе упадет на фильтрации.
+    if not isinstance(all_resources_list, list):
+        all_resources_list = [all_resources_list]
+    # Сначала получить все английские ресурсы.
+    for en_resource in list(filter(lambda x: x['@language'].lower() == "en", all_resources_list)):
+        resource_name = en_resource['@code']
+        # По имени английского ресурса найти русский в том же файле.
+        ru_resource = list(filter(lambda x: x['@language'].lower() == "ru" and x['@code'].lower() == resource_name.lower(), all_resources_list))
+        if len(ru_resource) >= 1:
+            ru_resource = ru_resource[0]
+            try:
+                line = [xml_filename,
+                        get_filename_without_ext_and_src_folder(xml_filename),
+                        en_resource['@code'],
+                        ru_resource['#text'],
+                        en_resource['#text'],
+                        False,
+                        'TODO поиск']
+                resources_list.append(line)
+            except:
+                pass
+    return resources_list
+
+def get_resources_list(src_folder):
+    """Получить полный список всех ресурсов из файлов решения: прикладные и из ЛК."""
+    resources_list = []
+    mtd_files_list = find_all_mtd_files(src_folder)
+    for mtd_filename in mtd_files_list:
+        print(mtd_filename)
+        resources_list_in_file = get_resources_list_from_mtd_file(mtd_filename)
+        resources_list.extend(resources_list_in_file)
+    xml_files_list = find_all_xml_files(src_folder)
+    for xml_filename in xml_files_list:
+        print(xml_filename)
+        resources_list_in_file = get_resources_list_from_xml_file(xml_filename)
+        resources_list.extend(resources_list_in_file)
+    return resources_list
+#endregion
+
+#region hight-level functions.
+def export_resources(src_folder, is_todo, output_folder):
+    """Выгрузить ресурсы решения из указанной папки:
+        src_folder: папка с исходниками
+        is_todo: True - строки с todo, иначе все строки
+        output_folder: папка для файла xlsx."""
+    print("==========Экспорт запущен==========")
+    from datetime import datetime
+    start_time = datetime.now()
+    print("Анализ:")
+    all_resources_list = get_resources_list(src_folder)
+    if is_todo:
+        # Ряд ресурсов не определяется как строка, добавлено явное преобразование, иначе падает на функциях для работы со строками.
+        not_localized_resources_list = list(filter(lambda x: str(x[3]).lower().startswith("todo") or str(x[4]).lower().startswith("todo"), all_resources_list))
+    else:
+        not_localized_resources_list = all_resources_list.copy()
+    print("Запись в файл:")
+    wb = Workbook()
+    not_localized_worksheet = create_not_localized_worksheet(wb)
+    for resource in not_localized_resources_list:
+        not_localized_worksheet.append([resource[1].replace("@", "\@"), resource[2], resource[3], resource[4], resource[6]])
+    not_localized_count = len(not_localized_resources_list)
+    range = not_localized_worksheet['A2:D' + str(not_localized_count + 1)]
+    add_style_to_range(range)
+    excel_filename = get_output_excel_filename(output_folder)
+    wb.save(excel_filename)
+    print(f"Выгружено в файл: {excel_filename}")
+    print(f"Не локализовано: {str(not_localized_count)}")
+    end_time = datetime.now()
+    total_time = end_time - start_time
+    print(f"Время работы: {total_time.seconds} сек.")
+    print("==========Экспорт завершен==========")
+#endregion
+#endregion
 
 #endregion
 
@@ -1069,6 +1374,23 @@ distributions:
     #endregion
 
     #region other
+    def export_res(self, src_folder: str = None, mode: str = 'todo', output_folder: str = None) -> None:
+        """Удалить старые логи. Чистит в root_logs и в подкаталогах.
+        Предполагается, что последние символы имени файла лога - YYYY-MM-DD.log
+
+        Args:
+            src_folder: папка с исходниками
+            mode: режим работы: 'todo' - строки с todo, 'all' - все строки
+            output_folder: папка для файла xlsx.
+        """
+        if not os.path.exists(src_folder):
+            print("Указанная папка с исходниками не существует.")
+            exit()
+        if (mode.lower() != 'todo') and (mode.lower() != 'all'):
+            print("Режим работы указан неверно: 'todo' - строки с todo, 'all' - все строки.")
+            exit()
+        export_resources(src_folder, mode == 'todo', output_folder)
+
     def clear_log(self, root_logs: str = None, limit_day: int = 3, need_pause: bool = False) -> None:
         """Удалить старые логи. Чистит в root_logs и в подкаталогах.
         Предполагается, что последние символы имени файла лога - YYYY-MM-DD.log
@@ -1195,5 +1517,7 @@ distributions:
         log.info('do map url - показать url для подключения к веб-клиенту текущего инстанса')
         log.info('do map check_config - показать ключевую информацию из указанного yml-файла описания проекта')
         log.info('do map check_sdk - проверить наличие необходимых компонент git и .Net')
+
+        log.info('do map export_res - выгрузить строки локализации')
 
     #endregion
