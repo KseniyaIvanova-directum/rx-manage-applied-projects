@@ -391,13 +391,13 @@ def repo_info(root_src, folder):
 #region localization helper.
 #region work with excel.
 def create_for_localization_worksheet(workbook):
-    """Создать лист для выгрузки строк на локализацию.
+    """Создать лист excel для выгрузки ресурсов на локализацию.
     
     Args:
         workbook: книга в excel. 
 
     Return:
-        Лист в excel-файле для выгрузки строк на локализацию. 
+        Лист в excel-файле для выгрузки ресурсов на локализацию. 
     """
     worksheet = workbook.active
     worksheet.title = "На локализацию"
@@ -426,6 +426,31 @@ def create_for_localization_worksheet(workbook):
     worksheet.column_dimensions['L'].width = 80
     worksheet['L1'] = "Ответ"
     header = worksheet['A1:L1']
+    add_style_to_header(header)
+    return worksheet
+
+def create_not_used_worksheet(workbook):
+    """Создать лист excel для выгрузки неиспользуемых ресурсов.
+
+    Args:
+        workbook: книга в excel. 
+
+    Return:
+        Лист в excel-файле для выгрузки неиспользуемых ресурсов. 
+    """
+    worksheet = workbook.create_sheet()
+    worksheet.title = "Не используется"
+    worksheet.column_dimensions['A'].width = 10
+    worksheet['A1'] = "Источник"
+    worksheet.column_dimensions['B'].width = 40
+    worksheet['B1'] = "Сущность"
+    worksheet.column_dimensions['C'].width = 40
+    worksheet['C1'] = "Имя ресурса"
+    worksheet.column_dimensions['D'].width = 80
+    worksheet['D1'] = "Русский текст ресурса"
+    worksheet.column_dimensions['E'].width = 80
+    worksheet['E1'] = "Английский текст ресурса"
+    header = worksheet['A1:E1']
     add_style_to_header(header)
     return worksheet
 
@@ -459,7 +484,7 @@ def add_style_to_range(range):
 
 #region work with files and folders.
 def find_all_ess_resources_files(src_ess_folders_list):
-    """Получить все xml-файлы с ресурсами  ЛК из заданного списка папок.
+    """Получить все xml-файлы с ресурсами ЛК из заданного списка папок.
     Взять только те, где есть раздел localizedStringValues, так как только в них содержатся ресурсы.
     
     Args:
@@ -484,6 +509,22 @@ def find_all_ess_resources_files(src_ess_folders_list):
                     pass
                 else:
                     resources_files.append(filename)
+    return resources_files
+
+def find_all_ess_src_files(src_ess_folders_list):
+    """Получить все xml-файлы с исходниками ЛК из заданного списка папок.
+    
+    Args:
+        src_ess_folders_list: список папок.
+    
+    Return:
+        Список файлов с исходниками ЛК.  
+    """
+    import glob
+    resources_files = []
+    for src_ess_folder in src_ess_folders_list:
+        xml_files = glob.glob(src_ess_folder + "\\**\\*.xml", recursive=True)
+        resources_files.extend(xml_files)
     return resources_files
 
 def get_filename_without_ext(filename):
@@ -542,30 +583,31 @@ def find_all_ess_resources(filename):
         else:
             return resources_list
 
-def get_resources_list_from_ess_xml_file(xml_filename):
+def get_resources_list_from_ess_xml_file(ess_resources_filename, src_ess_list):
     """Получить ресурсы из конфига ЛК.
     
     Args:
-        xml_filename: файл с ресурсами ЛК.
+        ess_resources_filename: файл с ресурсами ЛК.
+        src_ess_list: список с исходниками ЛК.
     
     Return:
         Список с ресурсами.  
     """
     resources_list = []
-    all_resources_list = find_all_ess_resources(xml_filename)
+    all_resources_list = find_all_ess_resources(ess_resources_filename)
     code_resources_list = list(set(map(lambda x: x['@code'], all_resources_list)))
     for resource_code in code_resources_list:
         find_en_resource = find_resource_in_list(all_resources_list, resource_code, "en")
         find_ru_resource = find_resource_in_list(all_resources_list, resource_code, "ru")
-        # TODO: реализовать поиск использования строки в исходниках в using
+        using = find_resource_in_ess_src_data(src_ess_list, resource_code)
         line = {'source': 'ЛК',
-                'filename': xml_filename,
-                'component': get_filename_without_ext_and_src_folder(xml_filename),
+                'filename': ess_resources_filename,
+                'component': get_filename_without_ext_and_src_folder(ess_resources_filename),
                 'code': resource_code,
                 'ru_resource': find_ru_resource['resource'],
                 'en_resource': find_en_resource['resource'],
                 'is_system': False,
-                'using': '',
+                'using': using,
                 'remark': f"{find_en_resource['remark']} {find_ru_resource['remark']}".strip()}
         resources_list.append(line)
     return resources_list
@@ -623,13 +665,85 @@ def get_resources_list(src_folders_list, src_ess_folders_list):
     """
     resources_list = []
     # TODO Добавить выгрузку ресурсов из mtd-файлов.
-    xml_files_list = find_all_ess_resources_files(src_ess_folders_list)
-    for xml_filename in xml_files_list:
-        log.info(xml_filename)
-        resources_list_in_file = get_resources_list_from_ess_xml_file(xml_filename)
+    ess_resources_files_list = find_all_ess_resources_files(src_ess_folders_list)
+    src_ess_list = get_all_ess_src_data(src_ess_folders_list)
+    for ess_resources_filename in ess_resources_files_list:
+        log.info(ess_resources_filename)
+        resources_list_in_file = get_resources_list_from_ess_xml_file(ess_resources_filename, src_ess_list)
         resources_list.extend(resources_list_in_file)
     return resources_list
 #endregion
+
+# region search in sources functions.
+def get_all_ess_src_data(src_ess_folders_list):
+    """Получить исходники ЛК из указанной папки.
+    
+    Args:
+        src_ess_folders_list: список папок с конфигами ЛК.
+    
+    Return:
+        Список с исходниками ЛК из указанной папки.
+    """
+    import codecs
+    src_data = []
+    src_files = find_all_ess_src_files(src_ess_folders_list)
+    for filename in src_files:
+        with codecs.open(filename, "r", "utf_8_sig") as f:
+            try:
+                text = f.read()
+            except:
+                pass
+            else:
+                src_data.append({'filename': filename, 'text': text})
+    return src_data
+
+def find_resource_in_ess_src_data(src_list, resource_code):
+    """Найти использование ресурса в исходниках.
+    
+    Args:
+        src_ess_list: список с исходниками.
+        resource_code: код ресурса.
+    
+    Return:
+        Место использования. Первое вхождение.
+    """
+    import re
+    pattern = f"\.{resource_code}".lower()
+    for data in src_list:
+        filename = data['filename']
+        text = data['text']
+        res = re.search(pattern, text.lower())
+        if res is not None:
+            # Разбить файл построчно, найти номер строки, в которой есть код ресурса.
+            src_file_list = text.split("\n")
+            str_number = list(map(lambda x: x.lower().find(f".{resource_code}".lower()) != -1, src_file_list)).index(True)
+            # Вывести фрагмент использования.
+            return get_using_fragment(src_file_list, filename, str_number)
+    return ""
+
+def get_using_fragment(src_file_list, filename, str_number):
+    """Найти фрагмент использования ресурса.
+    
+    Args:
+        src_file_list: файл с исходниками, разбитыйй на список строк.
+        filename: путь до файла с исходниками.
+        str_number: номер строки.
+    
+    Return:
+        Фрагмент использования: файл с папкой, в которой он расположен (полный путь выводить не имеет смысла), номер строки, а также сама строка, 
+        ее предшествующая и следующая без лишних пробелов.
+    """
+    s_path = filename.split("\\")
+    short_path = f"{s_path[len(s_path) - 2]}\{s_path[len(s_path) - 1]}"
+    src_file_fragment = ""
+    if str_number > 0:
+        src_file_fragment += f"\n{src_file_list[str_number - 1].strip()}"
+    src_file_fragment += f"\n{src_file_list[str_number].strip()}" 
+    if str_number < len(src_file_list) - 1:
+        src_file_fragment += f"\n{src_file_list[str_number + 1].strip()}"
+    return f"{short_path}: {str_number + 1}\n{src_file_fragment}"
+
+# endregion
 
 #region hight-level functions.
 def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_file):
@@ -638,36 +752,45 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     Args:
         src_folders_list: список папок с исходниками ПЧ.
         src_ess_folders_list: список папок с конфигами ЛК.
-        is_todo: True - строки с todo, иначе все строки.
+        is_todo: True - ресурсы с todo, иначе все ресурсы.
         output_file: файла xlsx для выгрузки.
     """
     log.info("==========Экспорт запущен==========")
     log.info("Анализ")
     all_resources_list = get_resources_list(src_folders_list, src_ess_folders_list)
-    # На лист "На локализацию" добавить все ресурсы или только ресурсы с todo, в завиимости от варианта запуска.
-    if is_todo:
-        # Ряд ресурсов не определяется как строка, добавлено явное преобразование, иначе падает на функциях для работы со строками.
-        # Вместе со строками с "todo" выгрузить строки с примечаниями - в примечании указана проблема со строкой. 
-        for_localization_resources_list = list(filter(lambda x: str(x['ru_resource']).lower().startswith("todo") or 
-                                                                str(x['en_resource']).lower().startswith("todo") or
-                                                                x['remark'] != "", all_resources_list))
-    else:
-        for_localization_resources_list = all_resources_list.copy()
     log.info("Запись в файл")
     wb = Workbook()
     for_localization_worksheet = create_for_localization_worksheet(wb)
+    # На лист "На локализацию" добавить все ресурсы или только ресурсы с todo, в завиимости от варианта запуска. Иcключить неиспользуемые ресурсы.
+    for_localization_resources_list = list(filter(lambda x: x['using'] != "", all_resources_list))
+    if is_todo:
+        # Ряд ресурсов не определяется как строка, добавлено явное преобразование, иначе падает на функциях для работы со строками.
+        # Вместе со ресурсами с "todo" выгрузить ресурсы с примечаниями - в примечании указана проблема с ресурсом.
+        for_localization_resources_list = list(filter(lambda x: (str(x['ru_resource']).lower().startswith("todo") or 
+                                                                 str(x['en_resource']).lower().startswith("todo") or
+                                                                 x['remark'] != ""), for_localization_resources_list))
     for resource in for_localization_resources_list:
         for_localization_worksheet.append([resource['source'], resource['component'], resource['code'], resource['ru_resource'], resource['en_resource'],
                                            resource['using'], '', '', '', resource['remark']])
     for_localization_count = len(for_localization_resources_list)
     range = for_localization_worksheet['A2:L' + str(for_localization_count + 1)]
     add_style_to_range(range)
+    # На лист "Не используется" добавить все неиспользуемые ресурсы. Создавать лист, только есть ресурсы для добавления.
+    not_used_resources_list = list(filter(lambda x: x['using'] == "", all_resources_list))
+    not_used_count = len(not_used_resources_list)
+    if not_used_count > 0:
+        not_used_worksheet = create_not_used_worksheet(wb)
+        for resource in not_used_resources_list:
+            not_used_worksheet.append([resource['source'], resource['component'], resource['code'], resource['ru_resource'], resource['en_resource']])
+        range = not_used_worksheet['A2:E' + str(not_used_count + 1)]
+        add_style_to_range(range)
     # Сохранить в файл, предварительно создав папку, если ее еще не существует.
     output_folder = get_file_path(output_file)
     os.makedirs(output_folder, exist_ok=True)
     wb.save(output_file)
     log.info(f"Выгружено в файл: {output_file}")
     log.info(f"Не локализовано: {str(for_localization_count)}")
+    log.info(f"Не используется: {str(not_used_count)}")
     log.info("==========Экспорт завершен==========")
 #endregion
 #endregion
@@ -1358,7 +1481,7 @@ distributions:
 
         Args:
             export_res_config: путь до конфига, содержащего список папок с исходниками ПЧ и ЛК.
-            mode: режим работы: 'todo' - строки с todo, 'all' - все строки.
+            mode: режим работы: 'todo' - ресурсы с todo, 'all' - все ресурсы.
             output_file: файл xlsx для выгрузки.
         """
         if not os.path.exists(export_res_config):
@@ -1377,8 +1500,15 @@ distributions:
                 log.error(f"Папка с исходниками ЛК {src_ess_folder} не существует.")
                 raise FileNotFoundError(f"'src_ess_folder' folder not found: '{src_ess_folder}'")
         if (mode.lower() != 'todo') and (mode.lower() != 'all'):
-            log.error("Режим работы указан неверно: 'todo' - строки с todo, 'all' - все строки.")
+            log.error("Режим работы указан неверно: 'todo' - ресурсы с todo, 'all' - все ресурсы.")
             raise ValueError(f"'mode' value '{mode}' incorrect: allowed values are 'todo' or 'all'.")
+        if os.path.exists(output_file):
+            try:
+                os.rename(output_file, output_file + '~')
+                os.rename(output_file + '~', output_file)
+            except IOError:
+                log.error(f"Файл для выгрузки '{output_file}' занят.")
+                raise IOError(f"output file '{output_file}' access deny.")
         export_resources(src_folders_list, src_ess_folders_list, mode == 'todo', output_file)
 
     def clear_log(self, root_logs: str = None, limit_day: int = 3, need_pause: bool = False) -> None:
@@ -1508,6 +1638,6 @@ distributions:
         log.info('do map check_config - показать ключевую информацию из указанного yml-файла описания проекта')
         log.info('do map check_sdk - проверить наличие необходимых компонент git и .Net')
 
-        log.info('do map export_res - выгрузить строки локализации')
+        log.info('do map export_res - выгрузить ресурсы')
 
     #endregion
