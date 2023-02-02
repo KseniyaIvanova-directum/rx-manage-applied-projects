@@ -29,6 +29,9 @@ from common_plugin import git_tools
 
 
 MANAGE_APPLIED_PROJECTS_ALIAS = 'map'
+DELETE_MARKER = "_delete_%$#@"
+ESS_SOURCE = "ЛК"
+APP_SOURCE = "ПЧ"
 
 #region service function
 
@@ -480,6 +483,32 @@ def add_style_to_range(range):
             cell.alignment = Alignment(horizontal='general',
                                        vertical='top',
                                        wrap_text=True)
+
+def get_resources_list_from_xls(input_file, sheet_name, res_count):
+    """Загрузить ресурсы решения из xlsx файла в список:
+
+    Args:
+        input_file: файл xlsx с вычитанными и переведенными ресурсами для загрузки.
+        sheet_name: имя листа xlsx файла с ресурсами.
+        res_count: количество строк на листе.
+
+    Return:
+        Список словарей с ресурсами из xlsx файла.
+    """
+    all_resources_list = []
+    wb = load_workbook(input_file)
+    worksheet = wb[sheet_name]
+    for i in range(2, res_count + 2):
+        line = {'source': worksheet[f'A{i}'].value,
+                'component': worksheet[f'B{i}'].value,
+                'code': worksheet[f'C{i}'].value,
+                'ru_resource': worksheet[f'D{i}'].value,
+                'en_resource': worksheet[f'E{i}'].value,
+                'new_code': worksheet[f'G{i}'].value,
+                'new_ru_resource': worksheet[f'H{i}'].value,
+                'new_en_resource': worksheet[f'I{i}'].value}
+        all_resources_list.append(line)
+    return all_resources_list
 #endregion
 
 #region work with files and folders.
@@ -600,7 +629,7 @@ def get_resources_list_from_ess_xml_file(ess_resources_filename, src_ess_list):
         find_en_resource = find_resource_in_list(all_resources_list, resource_code, "en")
         find_ru_resource = find_resource_in_list(all_resources_list, resource_code, "ru")
         using = find_resource_in_ess_src_data(src_ess_list, resource_code)
-        line = {'source': 'ЛК',
+        line = {'source': ESS_SOURCE,
                 'filename': ess_resources_filename,
                 'component': get_filename_without_ext_and_src_folder(ess_resources_filename),
                 'code': resource_code,
@@ -653,7 +682,7 @@ def get_resource_ess_text(resource):
         resource_text = ''
     return resource_text
 
-def get_resources_list(src_folders_list, src_ess_folders_list):
+def get_resources_list_from_src(src_folders_list, src_ess_folders_list):
     """Получить полный список всех ресурсов из файлов решения: из ПЧ и из ЛК.
     
     Args:
@@ -725,7 +754,7 @@ def get_using_fragment(src_file_list, filename, str_number):
     """Найти фрагмент использования ресурса.
     
     Args:
-        src_file_list: файл с исходниками, разбитыйй на список строк.
+        src_file_list: файл с исходниками, разбитый на список строк.
         filename: путь до файла с исходниками.
         str_number: номер строки.
     
@@ -743,6 +772,71 @@ def get_using_fragment(src_file_list, filename, str_number):
         src_file_fragment += f"\n{src_file_list[str_number + 1].strip()}"
     return f"{short_path}: {str_number + 1}\n{src_file_fragment}"
 
+def replace_xml_spec_symbols(resource):
+    """Заменить спец.символы "<" и ">" в переданном ресурсе. Вспомогательная ф-я.
+
+    Args:
+        resource: текст ресурса.
+    
+    Return:
+        Текст ресурса с замененными спец.символами."""
+    return resource.replace("<", "&lt;").replace(">", "&gt;")
+
+
+def import_ess_resources(src_ess_folders_list, ess_resources_list):
+    """Загрузить ресурсы ЛК в исходники:
+
+    Args:
+        src_ess_folders_list: список папок с конфигами ЛК.
+        ess_resources_list: список вычитанных и переведенных строк. 
+    """
+    import codecs
+    files_list = find_all_ess_src_files(src_ess_folders_list)
+    for filename in files_list:
+        log.info(filename)
+        component = get_filename_without_ext_and_src_folder(filename)
+        resources_list = list(filter(lambda x: x['component'] == component, ess_resources_list))
+        if len(resources_list) > 0:
+            is_modified = False
+            text = ""
+            with codecs.open(filename, "r", "utf_8_sig") as f:
+                text = f.read()
+            res_file_list = text.split("\n")
+            for resource in resources_list:
+                for index in range(0, len(res_file_list)):
+                    line = res_file_list[index]
+                    # Обработать английский ресурс, если его меняли.
+                    if resource['new_en_resource'] is not None and resource['new_en_resource'] != resource['en_resource'] and line.find(f'code="{resource["code"]}" language="EN"') != -1:
+                        # Обработать однострочные ресурсы отдельно, многострочные отдельно.
+                        is_modified = True
+                        if line.find('</localizedStringValue>') != -1:
+                            res_file_list[index] = line.replace(f'>{resource["en_resource"]}<', f'>{replace_xml_spec_symbols(resource["new_en_resource"])}<')
+                        else:
+                            res_file_list[index] = line.replace('>', f'>\n{replace_xml_spec_symbols(resource["new_en_resource"])}')
+                            n = 1
+                            while res_file_list[index + n].find("</localizedStringValue>") == -1:
+                                res_file_list[index + n] = DELETE_MARKER
+                                n += 1
+                    # Обработать русский ресурс, если его меняли.
+                    if resource['new_ru_resource'] is not None and resource['new_ru_resource'] != resource['ru_resource'] and line.find(f'code="{resource["code"]}" language="RU"') != -1:
+                        # Обработать однострочные ресурсы отдельно, многострочные отдельно.
+                        is_modified = True
+                        if line.find('</localizedStringValue>') != -1:
+                            res_file_list[index] = line.replace(f'>{resource["ru_resource"]}<', f'>{replace_xml_spec_symbols(resource["new_ru_resource"])}<')
+                        else:
+                            res_file_list[index] = line.replace('>', f'>\n{replace_xml_spec_symbols(resource["new_ru_resource"])}')
+                            n = 1
+                            while res_file_list[index + n].find("</localizedStringValue>") == -1:
+                                res_file_list[index + n] = DELETE_MARKER
+                                n += 1
+                    # Заменить коды ресурсов в строках на обоих языках.
+                    if resource['new_code'] is not None and resource['new_code'] != resource['code'] and line.find(f'code="{resource["code"]}"') != -1:
+                        is_modified = True
+                        res_file_list[index] = line.replace(f'"{resource["code"]}"', f'"{resource["new_code"]}"')
+            # Сохранять имеет смысл только измененные файлы.
+            if is_modified:
+                with codecs.open(filename, "w", "utf_8_sig") as f:
+                    f.write("\n".join(list(filter(lambda x: x.find(DELETE_MARKER) == -1, res_file_list))))
 # endregion
 
 #region hight-level functions.
@@ -757,7 +851,7 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     """
     log.info("==========Экспорт запущен==========")
     log.info("Анализ")
-    all_resources_list = get_resources_list(src_folders_list, src_ess_folders_list)
+    all_resources_list = get_resources_list_from_src(src_folders_list, src_ess_folders_list)
     log.info("Запись в файл")
     wb = Workbook()
     for_localization_worksheet = create_for_localization_worksheet(wb)
@@ -792,6 +886,31 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     log.info(f"Не локализовано: {str(for_localization_count)}")
     log.info(f"Не используется: {str(not_used_count)}")
     log.info("==========Экспорт завершен==========")
+
+def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_name, res_count):
+    """Загрузить ресурсы решения:
+
+    Args:
+        src_folders_list: список папок с исходниками ПЧ.
+        src_ess_folders_list: список папок с конфигами ЛК.
+        input_file: файл xlsx с вычитанными и переведенными ресурсами для загрузки.
+        sheet_name: имя листа xlsx файла с ресурсами.
+        res_count: количество строк на листе. 
+    """
+    print("==========Импорт запущен==========")
+    log.info("Анализ")
+    all_resources_list = get_resources_list_from_xls(input_file, sheet_name, res_count)
+    log.info("Запись в исходники")
+    # TODO Реализовать импорт ресурсов ПЧ.
+    # Импортировать ресурсы ЛК, если они есть.
+    ess_resources_list = list(filter(lambda x: x['source'] == ESS_SOURCE and
+                                 ((x['new_code'] is not None and x['new_code'] != x['code']) or
+                                  (x['new_ru_resource'] is not None and x['new_ru_resource'] != x['ru_resource']) or
+                                  (x['new_en_resource'] is not None and x['new_en_resource'] != x['en_resource'])), all_resources_list))
+    if len(ess_resources_list):
+        import_ess_resources(src_ess_folders_list, ess_resources_list)
+        
+    print("==========Импорт завершен==========")
 #endregion
 #endregion
 
@@ -1511,6 +1630,44 @@ distributions:
                 raise IOError(f"output file '{output_file}' access deny.")
         export_resources(src_folders_list, src_ess_folders_list, mode == 'todo', output_file)
 
+    def import_res(self, import_res_config: str = None, input_file: str = None, sheet_name: str = None, res_count: int = 0) -> None:
+        """Выгрузить ресурсы решения:
+
+        Args:
+            import_res_config: путь до конфига, содержащего список папок с исходниками ПЧ и ЛК.
+            input_file: файл xlsx с вычитанными и переведенными ресурсами для загрузки.
+            sheet_name: имя листа xlsx файла с ресурсами.
+            res_count: количество строк на листе.
+        """
+        if not os.path.exists(import_res_config):
+            raise FileNotFoundError(f'Не найден конфиг, содержащий список папок с исходниками ПЧ и ЛК {import_res_config}')
+        import_res_config = yaml_tools.load_yaml_from_file(import_res_config)
+        src_folders = import_res_config["variables"]["src_folders"]
+        src_ess_folders = import_res_config["variables"]["src_ess_folders"]
+        src_folders_list = src_folders.split('|')
+        for src_folder in src_folders_list:
+            if not os.path.exists(src_folder):
+                log.error(f"Папка с исходниками ПЧ {src_folder} не существует.")
+                raise FileNotFoundError(f"'src_folder' folder not found: '{src_folder}'")
+        src_ess_folders_list = src_ess_folders.split('|')
+        for src_ess_folder in src_ess_folders_list:
+            if not os.path.exists(src_ess_folder):
+                log.error(f"Папка с исходниками ЛК {src_ess_folder} не существует.")
+                raise FileNotFoundError(f"'src_ess_folder' folder not found: '{src_ess_folder}'")
+        if not os.path.exists(input_file):
+            log.error(f"Файл с вычитанными и переведенными ресурсами {input_file} не существует.")
+            raise FileNotFoundError(f"'input_file' file not found: '{input_file}'")
+        try:
+            wb = load_workbook(input_file)
+            worksheet = wb[sheet_name]
+        except:
+            log.error("Указанныйый лист xlsx файла с ресурсами не существует.")
+            raise ValueError(f"'sheet_name' xlsx sheet '{sheet_name}' not found.")
+        if (res_count <= 0):
+            log.error("Количество строк на листе должно быть положительным числом.")
+            raise ValueError(f"'res_count' value '{res_count}' must be positive.")
+        import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_name, res_count)
+
     def clear_log(self, root_logs: str = None, limit_day: int = 3, need_pause: bool = False) -> None:
         """Удалить старые логи. Чистит в root_logs и в подкаталогах.
         Предполагается, что последние символы имени файла лога - YYYY-MM-DD.log
@@ -1639,5 +1796,6 @@ distributions:
         log.info('do map check_sdk - проверить наличие необходимых компонент git и .Net')
 
         log.info('do map export_res - выгрузить ресурсы')
+        log.info('do map import_res - загрузить ресурсы')
 
     #endregion
