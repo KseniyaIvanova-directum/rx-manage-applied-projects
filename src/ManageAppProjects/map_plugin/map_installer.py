@@ -1004,6 +1004,91 @@ def replace_xml_spec_symbols(resource):
         Текст ресурса с замененными спец.символами."""
     return resource.replace("<", "&lt;").replace(">", "&gt;")
 
+def import_mtd_resources(src_folders_list, resources_list):
+    """Загрузить ресурсы ПЧ в исходники:
+
+    Args:
+        src_folders_list: список папок с исходниками ПЧ.
+        resources_list: список вычитанных и переведенных строк. 
+    """
+    import codecs
+    # Получить все файлы с ресурсами ПЧ.
+    all_mtd_files = find_all_mtd_files(src_folders_list)
+    for mtd_filename in all_mtd_files:
+        log.info(mtd_filename)
+        # Файл с ресурсом лежит в папке, совпадающей с именем компоненты - получить ее для ограничения списка строк для текущего mtd-файла.
+        # Исключение - Module.resx, для него необходимо взять имя папки решения.
+        splited_path = mtd_filename.split("\\")
+        if get_filename_without_ext_and_src_folder(mtd_filename) == 'Module':
+            component = splited_path[len(splited_path) - 3]
+        else:
+            component = splited_path[len(splited_path) - 2]
+        mtd_resources_list = list(filter(lambda x: x['component'] == component, resources_list))
+        if len(mtd_resources_list) > 0:
+            # Обработать сначала английские ресурсы.
+            en_res_file_list = [get_resource_filename_by_mtd_filename(mtd_filename, True, False), get_resource_filename_by_mtd_filename(mtd_filename, False, False)]
+            for filename in en_res_file_list:
+                if os.path.exists(filename):
+                    is_modified = False
+                    text = ""
+                    with codecs.open(filename, "r", "utf_8_sig") as f:
+                        text = f.read()
+                    res_file_list = text.split("\n")
+                    for resource in mtd_resources_list:
+                        for index in range(0, len(res_file_list) - 1):
+                            name_line = res_file_list[index]
+                            value_line = res_file_list[index + 1]
+                            if resource['new_en_resource'] is not None and resource['new_en_resource'] != resource['en_resource'] and name_line.find(f'<data name="{resource["code"]}"') != -1:
+                                # Обработать однострочные ресурсы отдельно, многострочные отдельно.
+                                is_modified = True
+                                if value_line.find('<value>') != -1 and value_line.find('</value>') != -1:
+                                    res_file_list[index + 1] = value_line.replace(f'>{resource["en_resource"]}<', f'>{replace_xml_spec_symbols(resource["new_en_resource"])}<')
+                                else:
+                                    res_file_list[index + 1] = value_line.replace('>', f'>\n{replace_xml_spec_symbols(resource["new_en_resource"])}')
+                                    n = 1
+                                    while res_file_list[index + n + 1].find("</value>") == -1:
+                                        res_file_list[index + n + 1] = DELETE_MARKER
+                                        n += 1
+                            # Заменить код ресурса.
+                            if resource['new_code'] is not None and resource['new_code'] != resource['code'] and name_line.find(f'<data name="{resource["code"]}"') != -1:
+                                is_modified = True
+                                res_file_list[index] = name_line.replace(f'"{resource["code"]}"', f'"{resource["new_code"]}"')
+                    # Сохранять имеет смысл только измененные файлы.
+                    if is_modified:
+                        with codecs.open(filename, "w", "utf_8_sig") as f:
+                            f.write("\n".join(list(filter(lambda x: x.find(DELETE_MARKER) == -1, res_file_list))))
+            # Обработать русские ресурсы.
+            ru_res_file_list = [get_resource_filename_by_mtd_filename(mtd_filename, True, True), get_resource_filename_by_mtd_filename(mtd_filename, False, True)]
+            for filename in ru_res_file_list:
+                if os.path.exists(filename):
+                    is_modified = False
+                    text = ""
+                    with codecs.open(filename, "r", "utf_8_sig") as f:
+                        text = f.read()
+                    res_file_list = text.split("\n")
+                    for resource in mtd_resources_list:
+                        for index in range(0, len(res_file_list) - 1):
+                            name_line = res_file_list[index]
+                            value_line = res_file_list[index + 1]
+                            if resource['new_ru_resource'] is not None and resource['new_ru_resource'] != resource['ru_resource'] and name_line.find(f'<data name="{resource["code"]}"') != -1:
+                                # Обработать однострочные ресурсы отдельно, многострочные отдельно.
+                                is_modified = True
+                                if value_line.find('<value>') != -1 and value_line.find('</value>') != -1:
+                                    res_file_list[index + 1] = value_line.replace(f'>{resource["ru_resource"]}<', f'>{replace_xml_spec_symbols(resource["new_ru_resource"])}<')
+                                else:
+                                    res_file_list[index + 1] = value_line.replace('>', f'>\n{replace_xml_spec_symbols(resource["new_ru_resource"])}')
+                                    n = 1
+                                    while res_file_list[index + n + 1].find("</value>") == -1:
+                                        res_file_list[index + n + 1] = DELETE_MARKER
+                                        n += 1
+                            # Заменить код ресурса.
+                            if resource['new_code'] is not None and resource['new_code'] != resource['code'] and name_line.find(f'<data name="{resource["code"]}"') != -1:
+                                is_modified = True
+                                res_file_list[index] = name_line.replace(f'"{resource["code"]}"', f'"{resource["new_code"]}"')
+                    # Сохранять имеет смысл только измененные файлы.
+                    if is_modified:
+                        with codecs.open(filename, "w", "utf_8_sig") as f:
+                            f.write("\n".join(list(filter(lambda x: x.find(DELETE_MARKER) == -1, res_file_list))))
 
 def import_ess_resources(src_ess_folders_list, ess_resources_list):
     """Загрузить ресурсы ЛК в исходники:
@@ -1013,7 +1098,7 @@ def import_ess_resources(src_ess_folders_list, ess_resources_list):
         ess_resources_list: список вычитанных и переведенных строк. 
     """
     import codecs
-    files_list = find_all_ess_src_files(src_ess_folders_list)
+    files_list = find_all_ess_resources_files(src_ess_folders_list)
     for filename in files_list:
         log.info(filename)
         component = get_filename_without_ext_and_src_folder(filename)
@@ -1123,17 +1208,21 @@ def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_n
     print("==========Импорт запущен==========")
     log.info("Анализ")
     all_resources_list = get_resources_list_from_xls(input_file, sheet_name, res_count)
+    # Обработать только те ресурсы, которые изменились в процессе вычитки и перевода.
+    all_resources_list = list(filter(lambda x: (x['new_code'] is not None and x['new_code'] != x['code']) or
+                                               (x['new_ru_resource'] is not None and x['new_ru_resource'] != x['ru_resource']) or
+                                               (x['new_en_resource'] is not None and x['new_en_resource'] != x['en_resource']), all_resources_list))
     log.info("Запись в исходники")
-    # TODO Реализовать импорт ресурсов ПЧ.
+    # Импортировать ресурсы ПЧ, если они есть.
+    resources_list = list(filter(lambda x: x['source'] == APP_SOURCE, all_resources_list))
+    if len(resources_list):
+        import_mtd_resources(src_folders_list, resources_list)
     # Импортировать ресурсы ЛК, если они есть.
-    ess_resources_list = list(filter(lambda x: x['source'] == ESS_SOURCE and
-                                 ((x['new_code'] is not None and x['new_code'] != x['code']) or
-                                  (x['new_ru_resource'] is not None and x['new_ru_resource'] != x['ru_resource']) or
-                                  (x['new_en_resource'] is not None and x['new_en_resource'] != x['en_resource'])), all_resources_list))
+    ess_resources_list = list(filter(lambda x: x['source'] == ESS_SOURCE, all_resources_list))
     if len(ess_resources_list):
         import_ess_resources(src_ess_folders_list, ess_resources_list)
-        
     print("==========Импорт завершен==========")
+
 #endregion
 #endregion
 
