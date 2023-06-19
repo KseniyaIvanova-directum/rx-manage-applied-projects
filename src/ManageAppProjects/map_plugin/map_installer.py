@@ -432,17 +432,18 @@ def create_for_localization_worksheet(workbook):
     add_style_to_header(header)
     return worksheet
 
-def create_not_used_worksheet(workbook):
-    """Создать лист excel для выгрузки неиспользуемых ресурсов.
+def create_named_worksheet(workbook, worksheet_title):
+    """Создать лист excel для выгрузки ресурсов (например, неиспользуемых, с символами из другого языка, с несоответствием пробелов).
 
     Args:
-        workbook: книга в excel. 
-
+        workbook: книга в excel.
+        worksheet_title: название листа.
+    
     Return:
-        Лист в excel-файле для выгрузки неиспользуемых ресурсов. 
+        Лист в excel-файле для выгрузки ресурсов. 
     """
     worksheet = workbook.create_sheet()
-    worksheet.title = "Не используется"
+    worksheet.title = worksheet_title
     worksheet.column_dimensions['A'].width = 10
     worksheet['A1'] = "Источник"
     worksheet.column_dimensions['B'].width = 40
@@ -699,19 +700,19 @@ def get_resources_list_from_file(mtd_filename, is_system, src_list):
                 ru_resource_value = ""
                 if ru_resource is not None:
                     ru_resource_value = ru_resource['value']
-                    using = ""
-                    if not is_system:
-                        using = find_resource_in_src_data(src_list, resource_code)
-                    line = {'source': APP_SOURCE ,
-                            'filename': mtd_filename,
-                            'component': component_name,
-                            'code': resource_code,
-                            'ru_resource': ru_resource_value,
-                            'en_resource': en_resource_value,
-                            'is_system': is_system,
-                            'using': using,
-                            'remark': ""}
-                    resources_list.append(line)
+                using = ""
+                if not is_system:
+                    using = find_resource_in_src_data(src_list, resource_code)
+                line = {'source': APP_SOURCE ,
+                        'filename': mtd_filename,
+                        'component': component_name,
+                        'code': resource_code,
+                        'ru_resource': ru_resource_value,
+                        'en_resource': en_resource_value,
+                        'is_system': is_system,
+                        'using': using,
+                        'remark': ""}
+                resources_list.append(line)
     return resources_list
 
 def find_all_resources(filename):
@@ -911,7 +912,15 @@ def get_all_src_data(src_folders_list):
     return src_data
 
 def find_resource_in_src_data(src_data, resource_code):
-    """Найти использование ресурса в исходниках прикладной из указанной папки."""
+    """Найти использование ресурса в исходниках прикладной из указанной папки.
+    
+    Args:
+        src_data: список с исходниками.
+        resource_code: код ресурса.
+    
+    Return:
+        Фрагмент с использованием ресурса.
+    """
     import re
     pattern = f'Converter\(\"{resource_code}\"\)|Resources\s*\.\s*{resource_code}|Resources\s*\.\s*\w+Report\s*\.\s*{resource_code}'.lower()
     for data in src_data:
@@ -1044,11 +1053,12 @@ def import_mtd_resources(src_folders_list, resources_list):
                                 if value_line.find('<value>') != -1 and value_line.find('</value>') != -1:
                                     res_file_list[index + 1] = value_line.replace(f'>{resource["en_resource"]}<', f'>{replace_xml_spec_symbols(resource["new_en_resource"])}<')
                                 else:
-                                    res_file_list[index + 1] = value_line.replace('>', f'>\n{replace_xml_spec_symbols(resource["new_en_resource"])}')
+                                    res_file_list[index + 1] = f'    <value>{replace_xml_spec_symbols(resource["new_en_resource"])}</value>'
                                     n = 1
                                     while res_file_list[index + n + 1].find("</value>") == -1:
                                         res_file_list[index + n + 1] = DELETE_MARKER
                                         n += 1
+                                    res_file_list[index + n + 1] = DELETE_MARKER
                             # Заменить код ресурса.
                             if resource['new_code'] is not None and resource['new_code'] != resource['code'] and name_line.find(f'<data name="{resource["code"]}"') != -1:
                                 is_modified = True
@@ -1057,6 +1067,7 @@ def import_mtd_resources(src_folders_list, resources_list):
                     if is_modified:
                         with codecs.open(filename, "w", "utf_8_sig") as f:
                             f.write("\n".join(list(filter(lambda x: x.find(DELETE_MARKER) == -1, res_file_list))))
+                            #f.write("\n".join(list(res_file_list)))
             # Обработать русские ресурсы.
             ru_res_file_list = [get_resource_filename_by_mtd_filename(mtd_filename, True, True), get_resource_filename_by_mtd_filename(mtd_filename, False, True)]
             for filename in ru_res_file_list:
@@ -1076,11 +1087,12 @@ def import_mtd_resources(src_folders_list, resources_list):
                                 if value_line.find('<value>') != -1 and value_line.find('</value>') != -1:
                                     res_file_list[index + 1] = value_line.replace(f'>{resource["ru_resource"]}<', f'>{replace_xml_spec_symbols(resource["new_ru_resource"])}<')
                                 else:
-                                    res_file_list[index + 1] = value_line.replace('>', f'>\n{replace_xml_spec_symbols(resource["new_ru_resource"])}')
+                                    res_file_list[index + 1] = f'    <value>{replace_xml_spec_symbols(resource["new_ru_resource"])}</value>'
                                     n = 1
                                     while res_file_list[index + n + 1].find("</value>") == -1:
                                         res_file_list[index + n + 1] = DELETE_MARKER
                                         n += 1
+                                    res_file_list[index + n + 1] = DELETE_MARKER
                             # Заменить код ресурса.
                             if resource['new_code'] is not None and resource['new_code'] != resource['code'] and name_line.find(f'<data name="{resource["code"]}"') != -1:
                                 is_modified = True
@@ -1089,6 +1101,7 @@ def import_mtd_resources(src_folders_list, resources_list):
                     if is_modified:
                         with codecs.open(filename, "w", "utf_8_sig") as f:
                             f.write("\n".join(list(filter(lambda x: x.find(DELETE_MARKER) == -1, res_file_list))))
+                            #f.write("\n".join(list(res_file_list)))
 
 def import_ess_resources(src_ess_folders_list, ess_resources_list):
     """Загрузить ресурсы ЛК в исходники:
@@ -1119,7 +1132,7 @@ def import_ess_resources(src_ess_folders_list, ess_resources_list):
                         if line.find('</localizedStringValue>') != -1:
                             res_file_list[index] = line.replace(f'>{resource["en_resource"]}<', f'>{replace_xml_spec_symbols(resource["new_en_resource"])}<')
                         else:
-                            res_file_list[index] = line.replace('>', f'>\n{replace_xml_spec_symbols(resource["new_en_resource"])}')
+                            res_file_list[index] = line.replace('>', f'>\n    {replace_xml_spec_symbols(resource["new_en_resource"])}')
                             n = 1
                             while res_file_list[index + n].find("</localizedStringValue>") == -1:
                                 res_file_list[index + n] = DELETE_MARKER
@@ -1131,19 +1144,20 @@ def import_ess_resources(src_ess_folders_list, ess_resources_list):
                         if line.find('</localizedStringValue>') != -1:
                             res_file_list[index] = line.replace(f'>{resource["ru_resource"]}<', f'>{replace_xml_spec_symbols(resource["new_ru_resource"])}<')
                         else:
-                            res_file_list[index] = line.replace('>', f'>\n{replace_xml_spec_symbols(resource["new_ru_resource"])}')
+                            res_file_list[index] = line.replace('>', f'>\n    {replace_xml_spec_symbols(resource["new_ru_resource"])}')
                             n = 1
                             while res_file_list[index + n].find("</localizedStringValue>") == -1:
                                 res_file_list[index + n] = DELETE_MARKER
                                 n += 1
                     # Заменить коды ресурсов в строках на обоих языках.
-                    if resource['new_code'] is not None and resource['new_code'] != resource['code'] and line.find(f'code="{resource["code"]}"') != -1:
-                        is_modified = True
-                        res_file_list[index] = line.replace(f'"{resource["code"]}"', f'"{resource["new_code"]}"')
+                    #if resource['new_code'] is not None and resource['new_code'] != resource['code'] and line.find(f'code="{resource["code"]}"') != -1:
+                    #    is_modified = True
+                    #    res_file_list[index] = line.replace(f'"{resource["code"]}"', f'"{resource["new_code"]}"')
             # Сохранять имеет смысл только измененные файлы.
             if is_modified:
                 with codecs.open(filename, "w", "utf_8_sig") as f:
-                    f.write("\n".join(list(filter(lambda x: x.find(DELETE_MARKER) == -1, res_file_list))))
+                    #f.write("\n".join(list(filter(lambda x: x.find(DELETE_MARKER) == -1, res_file_list))))
+                    f.write("\n".join(list(res_file_list)))
 # endregion
 
 #region hight-level functions.
@@ -1169,22 +1183,68 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
         # Ряд ресурсов не определяется как строка, добавлено явное преобразование, иначе падает на функциях для работы со строками.
         # Вместе со ресурсами с "todo" выгрузить ресурсы с примечаниями - в примечании указана проблема с ресурсом.
         for_localization_resources_list = list(filter(lambda x: (str(x['ru_resource']).lower().startswith("todo") or
-                                                                 str(x['en_resource']).lower().startswith("todo") or x['remark'] != ""), for_localization_resources_list))
+                                                                 str(x['en_resource']).lower().startswith("todo") or
+                                                                 x['remark'] != ""), for_localization_resources_list))
     for resource in for_localization_resources_list:
         for_localization_worksheet.append([resource['source'], resource['component'], resource['code'], resource['ru_resource'], resource['en_resource'],
                                            resource['using'], '', '', '', resource['remark']])
     for_localization_count = len(for_localization_resources_list)
     range = for_localization_worksheet['A2:L' + str(for_localization_count + 1)]
     add_style_to_range(range)
-    # На лист "Не используется" добавить все неиспользуемые ресурсы. Создавать лист, только есть ресурсы для добавления.
+    # На лист "Не используется" добавить все неиспользуемые ресурсы. Создавать лист, только если есть ресурсы для добавления.
     # Из списка неиспользуемых исключить системные ресурсы, так как в коде не используется, и операции из истории, так как в прикладном коде их нет, они подхватываются платформой.
     not_used_resources_list = list(filter(lambda x: x['using'] == "" and not x['is_system'] and not str(x['code']).startswith("Enum_Operation"), all_resources_list))
     not_used_count = len(not_used_resources_list)
     if not_used_count > 0:
-        not_used_worksheet = create_not_used_worksheet(wb)
+        not_used_worksheet = create_named_worksheet(wb, "Не используется")
         for resource in not_used_resources_list:
             not_used_worksheet.append([resource['source'], resource['component'], resource['code'], resource['ru_resource'], resource['en_resource']])
         range = not_used_worksheet['A2:E' + str(not_used_count + 1)]
+        add_style_to_range(range)
+    # На лист "С анг. символами в рус." добавить те, где в русском ресурсе есть английские символы. Создавать лист, только если есть ресурсы для добавления.
+    # Исключить все невычитанные. Иcключить неиспользуемые ресурсы, но оставить системные ресурсы.
+    import re
+    en_in_ru_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and 
+                                            not str(x['ru_resource']).lower().startswith("todo") and not str(x['en_resource']).lower().startswith("todo") and
+                                            (re.search("[a-z]+", str(x['ru_resource']).lower()) is not None), all_resources_list))
+    en_in_ru_count = len(en_in_ru_resources_list)
+    if en_in_ru_count > 0:
+        en_in_ru_worksheet = create_named_worksheet(wb, "С анг. символами в рус.")
+        for resource in en_in_ru_resources_list:
+            en_in_ru_worksheet.append([resource['source'], resource['component'], resource['code'], resource['ru_resource'], resource['en_resource']])
+        range = en_in_ru_worksheet['A2:E' + str(en_in_ru_count + 1)]
+        add_style_to_range(range)
+    # На лист "С рус. символами в анг." добавить те, где в английском ресурсе есть русские символы. Создавать лист, только если есть ресурсы для добавления.
+    # Исключить все невычитанные. Иcключить неиспользуемые ресурсы, но оставить системные ресурсы.
+    ru_in_en_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and 
+                                            not str(x['ru_resource']).lower().startswith("todo") and not str(x['en_resource']).lower().startswith("todo") and
+                                            (re.search("[а-я]+", str(x['en_resource']).lower()) is not None), all_resources_list))
+    ru_in_en_count = len(ru_in_en_resources_list)
+    if ru_in_en_count > 0:
+        ru_in_en_worksheet = create_named_worksheet(wb, "С рус. символами в анг.")
+        for resource in ru_in_en_resources_list:
+            ru_in_en_worksheet.append([resource['source'], resource['component'], resource['code'], resource['ru_resource'], resource['en_resource']])
+        range = ru_in_en_worksheet['A2:E' + str(ru_in_en_count + 1)]
+        add_style_to_range(range)
+    # На лист "Несоответствие пробелов" добавить ресурсы, которые:
+    #  - содержат двойные пробелы
+    ###################  - начинаются или оканчиваются c разного кол-ва пробелов НЕ РАБОТАЕТ, xmltodict.parse обрезает пробелы с концов, условие закомментировано
+    #  - имеют разное кол-во переносов строк.
+    # Создавать лист, только если есть ресурсы для добавления. Исключить все невычитанные. Иcключить неиспользуемые ресурсы, но оставить системные ресурсы.
+    from itertools import takewhile
+    incorrect_spacing_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and
+                                                   not str(x['ru_resource']).lower().startswith("todo") and not str(x['en_resource']).lower().startswith("todo") and
+                                                   (str(x['ru_resource']).find("  ") != -1 or str(x['en_resource']).find("  ") != -1 or
+                                                    #list(takewhile(lambda s: s == " ", list(x['ru_resource']))) != list(takewhile(lambda s: s == " ", list(x['en_resource']))) or
+                                                    #list(takewhile(lambda s: s == " ", list(x['ru_resource'][::-1]))) != list(takewhile(lambda s: s == " ", list(x['en_resource'][::-1]))) or
+                                                    len(str(x['ru_resource']).split("\r\n")) != len(str(x['en_resource']).split("\r\n"))), all_resources_list))
+    incorrect_spacing_count = len(incorrect_spacing_resources_list)
+    if incorrect_spacing_count > 0:
+        incorrect_spacing_worksheet = create_named_worksheet(wb, "Несоответствие пробелов")
+        for resource in incorrect_spacing_resources_list:
+            # При добавлении в ячейку добавить "", иначе обрежет переносы строк и пробелы с концов ресурсов.
+            incorrect_spacing_worksheet.append([resource['source'], resource['component'], resource['code'], f'"{resource["ru_resource"]}"', f'"{resource["en_resource"]}"'])
+        range = incorrect_spacing_worksheet['A2:E' + str(incorrect_spacing_count + 1)]
         add_style_to_range(range)
     # Сохранить в файл, предварительно создав папку, если ее еще не существует.
     output_folder = get_file_path(output_file)
@@ -1193,6 +1253,9 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     log.info(f"Выгружено в файл: {output_file}")
     log.info(f"Не локализовано: {str(for_localization_count)}")
     log.info(f"Не используется: {str(not_used_count)}")
+    log.info(f"С анг. символами в рус.: {str(en_in_ru_count)}")
+    log.info(f"С рус. символами в анг.: {str(ru_in_en_count)}")
+    log.info(f"Несоответствие пробелов: {str(incorrect_spacing_count)}")
     log.info("==========Экспорт завершен==========")
 
 def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_name, res_count):
@@ -1221,6 +1284,7 @@ def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_n
     ess_resources_list = list(filter(lambda x: x['source'] == ESS_SOURCE, all_resources_list))
     if len(ess_resources_list):
         import_ess_resources(src_ess_folders_list, ess_resources_list)
+
     print("==========Импорт завершен==========")
 
 #endregion
