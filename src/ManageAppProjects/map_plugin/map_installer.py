@@ -32,6 +32,7 @@ MANAGE_APPLIED_PROJECTS_ALIAS = 'map'
 DELETE_MARKER = "_delete_%$#@"
 ESS_SOURCE = "ЛК"
 APP_SOURCE = "ПЧ"
+SETTINGS_SOURCE = "Настройки"
 
 #region service function
 
@@ -505,6 +506,7 @@ def get_resources_list_from_xls(input_file, sheet_name, res_count):
                 'code': worksheet[f'C{i}'].value,
                 'ru_resource': worksheet[f'D{i}'].value,
                 'en_resource': worksheet[f'E{i}'].value,
+                'using': worksheet[f'F{i}'].value,
                 'new_code': worksheet[f'G{i}'].value,
                 'new_ru_resource': worksheet[f'H{i}'].value,
                 'new_en_resource': worksheet[f'I{i}'].value}
@@ -513,6 +515,24 @@ def get_resources_list_from_xls(input_file, sheet_name, res_count):
 #endregion
 
 #region work with files and folders.
+def find_all_settings_resources_files(src_folders_list):
+    """Получить все json-файлы с ресурсами из заданной папки. 
+    Ресурсы хранятся в подпапке .Settings в файле *_localization.json.
+    
+    Args:
+        src_folders_list: список папок.
+    
+    Return:
+        Список файлов с ресурсами настроек бизнесс-процессов.
+    """
+    import glob
+    all_settings_files = []
+    for src_folder in src_folders_list:
+        settings_files = glob.glob(src_folder + "\\**\\*.Settings\\**\\*_localization.json", recursive=True)
+        all_settings_files.extend(settings_files)
+    return all_settings_files
+
+
 def find_all_mtd_files(src_folders_list):
     """Получить все mtd-файлы из заданной папки.
     Исключить файлы из папок VersionData, так как для них не будет файлов с ресурсами.
@@ -789,6 +809,51 @@ def find_all_ess_resources(filename):
             return []
         else:
             return resources_list
+        
+
+
+def get_resources_list_from_settings_file(settings_resources_filename):
+    """Получить ресурсы из схемы настройки бизнесс-процессов.
+    Args:
+        settings_resources_filename: файл с ресурсами настроек схем.
+
+    Return:
+        Список с ресурсами.
+    """
+    resources_list = []   
+
+    # Получить названия секций с ресурсами из файла со схемой.
+    settings_filename = settings_resources_filename.replace("_localization","")
+    import codecs
+    with codecs.open(settings_filename, "r", encoding='utf-8') as manifest_json:
+        data = " ".join(manifest_json.readlines())
+        manifest_dict = json.loads(data)
+        shema = manifest_dict["Scheme"]["Scheme"]
+        component = manifest_dict["Name"]
+
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(shema)
+    resourse_code_list = root.findall(".//**[Name='localizationStringId']//Value")
+
+    with codecs.open(settings_resources_filename, "r", encoding='utf-8') as manifest_json:
+        data = " ".join(manifest_json.readlines())
+        manifest_dict = json.loads(data)
+        for resourse_code in resourse_code_list:
+            try:
+                line = {'source': SETTINGS_SOURCE,
+                        'filename': settings_resources_filename,
+                        'component': component,
+                        'code': resourse_code.text,
+                        'ru_resource': manifest_dict[resourse_code.text]["ru-RU"],
+                        'en_resource': manifest_dict[resourse_code.text]["default"],
+                        'is_system': False,
+                        'using': settings_resources_filename,
+                        'remark': ""}
+                resources_list.append(line)
+            except:
+                pass
+     
+    return resources_list
 
 def get_resources_list_from_ess_xml_file(ess_resources_filename, src_ess_list):
     """Получить ресурсы из конфига ЛК.
@@ -884,6 +949,12 @@ def get_resources_list_from_src(src_folders_list, src_ess_folders_list):
     for ess_resources_filename in ess_resources_files_list:
         log.info(ess_resources_filename)
         resources_list_in_file = get_resources_list_from_ess_xml_file(ess_resources_filename, src_ess_list)
+        resources_list.extend(resources_list_in_file)
+    # Выгрузить ресурсы из настроек схем бизнес-процессов.
+    settings_resourses_files_list = find_all_settings_resources_files(src_folders_list)
+    for settings_resourses_filename in settings_resourses_files_list:
+        log.info(settings_resourses_filename)
+        resources_list_in_file = get_resources_list_from_settings_file(settings_resourses_filename)
         resources_list.extend(resources_list_in_file)
     return resources_list
 #endregion
@@ -1158,6 +1229,46 @@ def import_ess_resources(src_ess_folders_list, ess_resources_list):
                 with codecs.open(filename, "w", "utf_8_sig") as f:
                     #f.write("\n".join(list(filter(lambda x: x.find(DELETE_MARKER) == -1, res_file_list))))
                     f.write("\n".join(list(res_file_list)))
+
+def import_settings_resources(src_settings_folders_list, settings_resources_list):
+    """Загрузить ресурсы настроек схем бизнес-процессов в исходники:
+
+    Args:
+        src_settings_folders_list: список папок с исходниками.
+        settings_resources_list: список вычитанных и переведенных строк. 
+    """
+    import codecs
+    files_list = find_all_settings_resources_files(src_settings_folders_list)
+    for filename in files_list:
+        log.info(filename)
+        resources_list = list(filter(lambda x: x['using'] == filename, settings_resources_list))
+        if len(resources_list) > 0:
+            is_modified = False
+            with codecs.open(filename, "r", "utf_8_sig") as manifest_json:
+                data = " ".join(manifest_json.readlines())
+                res_file_list = json.loads(data)
+            #res_file_list = text.split("\n")
+            log.info(len(resources_list))
+            for resource in resources_list:
+                log.info(resource['code'])
+                log.info(resource['new_en_resource'])
+                # Обработать английский ресурс, если его меняли.
+                if resource['new_en_resource'] is not None and resource['new_en_resource'] != resource['en_resource']:
+                    is_modified = True
+                    log.info(resource['new_en_resource'])
+                    res_file_list[resource['code']]['default']=resource['new_en_resource']
+      
+                # Обработать русский ресурс, если его меняли.
+                if resource['new_ru_resource'] is not None and resource['new_ru_resource'] != resource['ru_resource']:
+                    is_modified = True
+                    log.info(resource['new_ru_resource'])
+                    res_file_list[resource['code']]['ru-RU']=resource['new_ru_resource']
+
+            # Сохранять имеет смысл только измененные файлы.
+            if is_modified:
+                with codecs.open(filename, "w", "utf_8_sig") as f:
+                    json.dump(res_file_list, f, indent=4, ensure_ascii=False)
+
 # endregion
 
 #region hight-level functions.
@@ -1177,8 +1288,13 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     wb = Workbook()
     for_localization_worksheet = create_for_localization_worksheet(wb)
     # На лист "На локализацию" добавить все ресурсы или только ресурсы с todo, в завиимости от варианта запуска.
-    # Иcключить неиспользуемые ресурсы, но оставить системные ресурсы (так как в коде не используется) и операции из истории (так как в прикладном коде их нет, они подхватываются платформой).
-    for_localization_resources_list = list(filter(lambda x: x['using'] != "" or x['is_system'] or str(x['code']).startswith("Enum_Operation"), all_resources_list))
+    # Иcключить неиспользуемые ресурсы, но оставить системные ресурсы (так как в коде не используется),
+    # операции из истории (так как в прикладном коде их нет, они подхватываются платформой),
+    # ресурсы из настроек схем бизнесс-процессов, т.к. они заданы на схеме. 
+    for_localization_resources_list = list(filter(lambda x: x['using'] != ""
+                                                  or x['is_system']
+                                                  or str(x['code']).startswith("Enum_Operation")
+                                                  or x['source'] == SETTINGS_SOURCE, all_resources_list))
     if is_todo:
         # Ряд ресурсов не определяется как строка, добавлено явное преобразование, иначе падает на функциях для работы со строками.
         # Вместе со ресурсами с "todo" выгрузить ресурсы с примечаниями - в примечании указана проблема с ресурсом.
@@ -1192,8 +1308,14 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     range = for_localization_worksheet['A2:L' + str(for_localization_count + 1)]
     add_style_to_range(range)
     # На лист "Не используется" добавить все неиспользуемые ресурсы. Создавать лист, только если есть ресурсы для добавления.
-    # Из списка неиспользуемых исключить системные ресурсы, так как в коде не используется, и операции из истории, так как в прикладном коде их нет, они подхватываются платформой.
-    not_used_resources_list = list(filter(lambda x: x['using'] == "" and not x['is_system'] and not str(x['code']).startswith("Enum_Operation"), all_resources_list))
+    # Из списка неиспользуемых исключить:
+    #   системные ресурсы, так как в коде не используется, 
+    #   операции из истории, так как в прикладном коде их нет, они подхватываются платформой,
+    #   ресурсы из настроек схем бизнесс-процессов, т.к. они заданы на схеме. 
+    not_used_resources_list = list(filter(lambda x: x['using'] == "" 
+                                          and not x['is_system'] 
+                                          and not str(x['code']).startswith("Enum_Operation")
+                                          and not x['source'] == SETTINGS_SOURCE, all_resources_list))
     not_used_count = len(not_used_resources_list)
     if not_used_count > 0:
         not_used_worksheet = create_named_worksheet(wb, "Не используется")
@@ -1284,6 +1406,11 @@ def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_n
     ess_resources_list = list(filter(lambda x: x['source'] == ESS_SOURCE, all_resources_list))
     if len(ess_resources_list):
         import_ess_resources(src_ess_folders_list, ess_resources_list)
+    # Импортировать ресурсы настроек, если они есть.
+    settings_resources_list = list(filter(lambda x: x['source'] == SETTINGS_SOURCE, all_resources_list))
+    log.info(len(settings_resources_list))
+    if len(settings_resources_list):
+        import_settings_resources(src_folders_list, settings_resources_list)
 
     print("==========Импорт завершен==========")
 
