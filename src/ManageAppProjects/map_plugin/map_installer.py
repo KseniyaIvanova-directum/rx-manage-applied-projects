@@ -1402,7 +1402,6 @@ def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_n
         import_ess_resources(src_ess_folders_list, ess_resources_list)
     # Импортировать ресурсы настроек, если они есть.
     settings_resources_list = list(filter(lambda x: x['source'] == SETTINGS_SOURCE, all_resources_list))
-    log.info(len(settings_resources_list))
     if len(settings_resources_list):
         import_settings_resources(src_folders_list, settings_resources_list)
 
