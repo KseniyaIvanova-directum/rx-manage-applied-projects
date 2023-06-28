@@ -1247,21 +1247,15 @@ def import_settings_resources(src_settings_folders_list, settings_resources_list
             with codecs.open(filename, "r", "utf_8_sig") as manifest_json:
                 data = " ".join(manifest_json.readlines())
                 res_file_list = json.loads(data)
-            #res_file_list = text.split("\n")
-            log.info(len(resources_list))
             for resource in resources_list:
-                log.info(resource['code'])
-                log.info(resource['new_en_resource'])
                 # Обработать английский ресурс, если его меняли.
                 if resource['new_en_resource'] is not None and resource['new_en_resource'] != resource['en_resource']:
                     is_modified = True
-                    log.info(resource['new_en_resource'])
                     res_file_list[resource['code']]['default']=resource['new_en_resource']
       
                 # Обработать русский ресурс, если его меняли.
                 if resource['new_ru_resource'] is not None and resource['new_ru_resource'] != resource['ru_resource']:
                     is_modified = True
-                    log.info(resource['new_ru_resource'])
                     res_file_list[resource['code']]['ru-RU']=resource['new_ru_resource']
 
             # Сохранять имеет смысл только измененные файлы.
