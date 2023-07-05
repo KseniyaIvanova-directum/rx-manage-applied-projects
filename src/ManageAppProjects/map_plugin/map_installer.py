@@ -515,21 +515,22 @@ def get_resources_list_from_xls(input_file, sheet_name, res_count):
 #endregion
 
 #region work with files and folders.
-def find_all_settings_resources_files(src_folders_list):
-    """Получить все json-файлы с ресурсами из заданной папки. 
-    Ресурсы хранятся в подпапке .Settings в файле *_localization.json.
+def find_all_settings_files(src_folders_list):
+    """Получить все json-файлы с настройками из заданной папки. 
+    Настройки хранятся в подпапке .Settings в файле *.json.
     
     Args:
         src_folders_list: список папок.
     
     Return:
-        Список файлов с ресурсами настроек бизнесс-процессов.
+        Список файлов с настройками бизнесс-процессов.
     """
     import glob
     all_settings_files = []
     for src_folder in src_folders_list:
-        settings_files = glob.glob(src_folder + "\\**\\*.Settings\\**\\*_localization.json", recursive=True)
+        settings_files = glob.glob(src_folder + "\\**\\*.Settings\\\ProcessKind\\*.json", recursive=True)
         all_settings_files.extend(settings_files)
+    all_settings_files = list(filter(lambda x: x.lower().find("_localization") == -1, all_settings_files))
     return all_settings_files
 
 
@@ -810,38 +811,51 @@ def find_all_ess_resources(filename):
         else:
             return resources_list
         
-
-
-def get_resources_list_from_settings_file(settings_resources_filename):
-    """Получить ресурсы из схемы настройки бизнесс-процессов.
+def get_resources_list_from_settings_file(settings_filename):
+    """Получить ресурсы из настройки бизнесс-процессов.
     Args:
-        settings_resources_filename: файл с ресурсами настроек схем.
+        settings_resources_filename: файл с настройками бизнес-процессов.
 
     Return:
         Список с ресурсами.
     """
     resources_list = []   
 
+    # В файле *_properties_localization.json хранятся ресурсы свойств настроек.
+    # В файле *_localization.json хранятся ресурсы из настройки схемы бизнесс процессов.
+    settings_resources_filename = settings_filename.replace(".json", "_localization.json")
+    settings_properties_resources_filename = settings_filename.replace(".json", "_properties_localization.json")
+    import os.path
+    if os.path.exists(settings_resources_filename) == False:
+        return resources_list
+    import codecs 
+    try:
+        with codecs.open(settings_properties_resources_filename, "r", encoding='utf-8') as manifest_json:
+            data = " ".join(manifest_json.readlines())
+            manifest_dict = json.loads(data)
+            component = manifest_dict["Name"]["ru-RU"] 
+    except:
+        component = ""
+
     # Получить названия секций с ресурсами из файла со схемой.
-    settings_filename = settings_resources_filename.replace("_localization","")
-    import codecs
+    
     with codecs.open(settings_filename, "r", encoding='utf-8') as manifest_json:
         data = " ".join(manifest_json.readlines())
         manifest_dict = json.loads(data)
         shema = manifest_dict["Scheme"]["Scheme"]
-        component = manifest_dict["Name"]
 
     import xml.etree.ElementTree as ET
     root = ET.fromstring(shema)
     resourse_code_list = root.findall(".//**[Name='localizationStringId']//Value")
+   
 
-    with codecs.open(settings_resources_filename, "r", encoding='utf-8') as manifest_json:
+    with codecs.open(settings_resources_filename, "r", encoding='utf-8-sig') as manifest_json:
         data = " ".join(manifest_json.readlines())
         manifest_dict = json.loads(data)
         for resourse_code in resourse_code_list:
             try:
                 line = {'source': SETTINGS_SOURCE,
-                        'filename': settings_resources_filename,
+                       'filename': settings_resources_filename,
                         'component': component,
                         'code': resourse_code.text,
                         'ru_resource': manifest_dict[resourse_code.text]["ru-RU"],
@@ -931,7 +945,6 @@ def get_resources_list_from_src(src_folders_list, src_ess_folders_list):
     Args:
         src_folders_list: список папок с исходниками ПЧ.
         src_ess_folders_list: список папок с конфигами ЛК.
-    
     Return:
         Список с ресурсами.
     """
@@ -951,7 +964,7 @@ def get_resources_list_from_src(src_folders_list, src_ess_folders_list):
         resources_list_in_file = get_resources_list_from_ess_xml_file(ess_resources_filename, src_ess_list)
         resources_list.extend(resources_list_in_file)
     # Выгрузить ресурсы из настроек схем бизнес-процессов.
-    settings_resourses_files_list = find_all_settings_resources_files(src_folders_list)
+    settings_resourses_files_list = find_all_settings_files(src_folders_list)
     for settings_resourses_filename in settings_resourses_files_list:
         log.info(settings_resourses_filename)
         resources_list_in_file = get_resources_list_from_settings_file(settings_resourses_filename)
@@ -1238,8 +1251,9 @@ def import_settings_resources(src_settings_folders_list, settings_resources_list
         settings_resources_list: список вычитанных и переведенных строк. 
     """
     import codecs
-    files_list = find_all_settings_resources_files(src_settings_folders_list)
+    files_list = find_all_settings_files(src_settings_folders_list)
     for filename in files_list:
+        filename = filename.replace(".json", "_localization.json")
         log.info(filename)
         resources_list = list(filter(lambda x: x['using'] == filename, settings_resources_list))
         if len(resources_list) > 0:
@@ -2127,7 +2141,7 @@ distributions:
         export_resources(src_folders_list, src_ess_folders_list, mode == 'todo', output_file)
 
     def import_res(self, import_res_config: str = None, input_file: str = None, sheet_name: str = None, res_count: int = 0) -> None:
-        """Выгрузить ресурсы решения:
+        """Загрузить ресурсы решения:
 
         Args:
             import_res_config: путь до конфига, содержащего список папок с исходниками ПЧ и ЛК.
