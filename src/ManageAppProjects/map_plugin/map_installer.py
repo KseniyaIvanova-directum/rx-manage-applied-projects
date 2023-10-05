@@ -1376,6 +1376,30 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
             incorrect_spacing_worksheet.append([resource['source'], resource['component'], resource['code'], f'"{resource["ru_resource"]}"', f'"{resource["en_resource"]}"'])
         range = incorrect_spacing_worksheet['A2:E' + str(incorrect_spacing_count + 1)]
         add_style_to_range(range)
+    # На лист "Пустая рус." добавить ресурсы, у которых нет русской локализации. Потенциально это те, которые вообще не локализовывали.
+    from itertools import takewhile
+    empty_ru_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and
+                                          not str(x['en_resource']).lower().startswith("todo") and
+                                          str(x['ru_resource']) == "", all_resources_list))
+    empty_ru_count = len(empty_ru_resources_list)
+    if empty_ru_count > 0:
+        empty_ru_worksheet = create_named_worksheet(wb, "Пустая рус.")
+        for resource in empty_ru_resources_list:
+            empty_ru_worksheet.append([resource['source'], resource['component'], resource['code'], resource["ru_resource"], resource["en_resource"]])
+        range = empty_ru_worksheet['A2:E' + str(empty_ru_count + 1)]
+        add_style_to_range(range)
+    # На лист "Анг. = рус." добавить ресурсы, у которых русская и английская строка совпадают. Потенциально это те, которые вообще не локализовывали.
+    from itertools import takewhile
+    eng_eq_ru_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and
+                                           not str(x['ru_resource']).lower().startswith("todo") and not str(x['en_resource']).lower().startswith("todo") and
+                                           str(x['en_resource']) == str(x['ru_resource']), all_resources_list))
+    eng_eq_ru_count = len(empty_ru_resources_list)
+    if eng_eq_ru_count > 0:
+        eng_eq_ru_worksheet = create_named_worksheet(wb, "Анг. равна рус.")
+        for resource in eng_eq_ru_resources_list:
+            eng_eq_ru_worksheet.append([resource['source'], resource['component'], resource['code'], resource["ru_resource"], resource["en_resource"]])
+        range = eng_eq_ru_worksheet['A2:E' + str(eng_eq_ru_count + 1)]
+        add_style_to_range(range)
     # Сохранить в файл, предварительно создав папку, если ее еще не существует.
     output_folder = get_file_path(output_file)
     os.makedirs(output_folder, exist_ok=True)
@@ -1386,6 +1410,8 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     log.info(f"С анг. символами в рус.: {str(en_in_ru_count)}")
     log.info(f"С рус. символами в анг.: {str(ru_in_en_count)}")
     log.info(f"Несоответствие пробелов: {str(incorrect_spacing_count)}")
+    log.info(f"Пустая русская: {str(empty_ru_count)}")
+    log.info(f"Анг. равна рус.: {str(eng_eq_ru_count)}")
     log.info("==========Экспорт завершен==========")
 
 def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_name, res_count):
