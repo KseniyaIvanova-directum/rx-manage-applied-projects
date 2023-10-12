@@ -2142,15 +2142,19 @@ distributions:
         if not os.path.exists(export_res_config):
             raise FileNotFoundError(f'Не найден конфиг, содержащий список папок с исходниками ПЧ и ЛК {export_res_config}')
         export_res_config = yaml_tools.load_yaml_from_file(export_res_config)
-        src_folders = export_res_config["variables"]["src_folders"]
-        src_ess_folders = export_res_config["variables"]["src_ess_folders"]
-        src_folders_list = src_folders.split('|')
-        for src_folder in src_folders_list:
+        root_folder = export_res_config["root_folder"]
+        src_folders = export_res_config["src_folders"]
+        src_folders_list = []
+        for src_folder in src_folders:
+            src_folder = root_folder + src_folder
             if not os.path.exists(src_folder):
                 log.error(f"Папка с исходниками ПЧ {src_folder} не существует.")
                 raise FileNotFoundError(f"'src_folder' folder not found: '{src_folder}'")
-        src_ess_folders_list = src_ess_folders.split('|')
-        for src_ess_folder in src_ess_folders_list:
+            src_folders_list.append(src_folder)
+        src_ess_folders = export_res_config["src_ess_folders"]
+        src_ess_folders_list = []
+        for src_ess_folder in src_ess_folders:
+            src_ess_folder = root_folder + src_ess_folder
             if not os.path.exists(src_ess_folder):
                 log.error(f"Папка с исходниками ЛК {src_ess_folder} не существует.")
                 raise FileNotFoundError(f"'src_ess_folder' folder not found: '{src_ess_folder}'")
@@ -2178,18 +2182,24 @@ distributions:
         if not os.path.exists(import_res_config):
             raise FileNotFoundError(f'Не найден конфиг, содержащий список папок с исходниками ПЧ и ЛК {import_res_config}')
         import_res_config = yaml_tools.load_yaml_from_file(import_res_config)
-        src_folders = import_res_config["variables"]["src_folders"]
-        src_ess_folders = import_res_config["variables"]["src_ess_folders"]
-        src_folders_list = src_folders.split('|')
-        for src_folder in src_folders_list:
+        root_folder = import_res_config["root_folder"]
+        src_folders = import_res_config["src_folders"]
+        src_folders_list = []
+        src_folders = src_folders.split('|')
+        for src_folder in src_folders:
+            src_folder = root_folder + src_folder
             if not os.path.exists(src_folder):
                 log.error(f"Папка с исходниками ПЧ {src_folder} не существует.")
                 raise FileNotFoundError(f"'src_folder' folder not found: '{src_folder}'")
-        src_ess_folders_list = src_ess_folders.split('|')
-        for src_ess_folder in src_ess_folders_list:
+            src_folders_list.append(src_folder)
+        src_ess_folders = import_res_config["src_ess_folders"]
+        src_ess_folders_list = []
+        for src_ess_folder in src_ess_folders:
+            src_ess_folder = root_folder + src_ess_folder
             if not os.path.exists(src_ess_folder):
                 log.error(f"Папка с исходниками ЛК {src_ess_folder} не существует.")
                 raise FileNotFoundError(f"'src_ess_folder' folder not found: '{src_ess_folder}'")
+            src_ess_folders_list.append(src_ess_folder)
         if not os.path.exists(input_file):
             log.error(f"Файл с вычитанными и переведенными ресурсами {input_file} не существует.")
             raise FileNotFoundError(f"'input_file' file not found: '{input_file}'")

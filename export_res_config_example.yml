@@ -1,6 +1,13 @@
 # Параметры экспорта ресурсов.
-variables:
-    # Список папок с исходниками ПЧ через '|'.
-    src_folders: ''
-    # Cписок папок с конфигами ЛК через '|'.
-    src_ess_folders: ''
+# Корневая папка.
+root_folder: ''
+# Список папок с исходниками ПЧ.
+src_folders:
+    - src_folder: ''
+    - src_folder: ''
+    - src_folder: ''
+# Cписок папок с конфигами ЛК.
+src_ess_folders:
+    - src_ess_folder: ''
+    - src_ess_folder: ''
+    - src_ess_folder: ''
