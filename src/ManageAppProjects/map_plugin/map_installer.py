@@ -1006,7 +1006,7 @@ def find_resource_in_src_data(src_data, resource_code):
         Фрагмент с использованием ресурса.
     """
     import re
-    pattern = f'Converter\(\"{resource_code}\"\)|Resources\s*\.\s*{resource_code}|Resources\s*\.\s*\w+Report\s*\.\s*{resource_code}'.lower()
+    pattern = f'Converter\(\"{resource_code}\"\)|Resources\s*\.\s*{resource_code}|Resources\s*\.\s*\w+Report\s*\.\s*{resource_code}|ExpressionElement\(\"{resource_code}\"|ExpressionElement\(\"\w+\"\,\s*\"{resource_code}\"'.lower()
     for data in src_data:
         filename = data['filename']
         text = data['text']
