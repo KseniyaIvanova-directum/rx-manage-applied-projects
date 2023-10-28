@@ -1275,7 +1275,7 @@ def import_settings_resources(src_settings_folders_list, settings_resources_list
             # Сохранять имеет смысл только измененные файлы.
             if is_modified:
                 with codecs.open(filename, "w", "utf_8_sig") as f:
-                    json.dump(res_file_list, f, indent=4, ensure_ascii=False)
+                    json.dump(res_file_list, f, indent=2, ensure_ascii=False)
 
 # endregion
 
