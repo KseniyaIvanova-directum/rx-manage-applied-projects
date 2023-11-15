@@ -1413,6 +1413,7 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     log.info(f"Пустая русская: {str(empty_ru_count)}")
     log.info(f"Анг. равна рус.: {str(eng_eq_ru_count)}")
     log.info("==========Экспорт завершен==========")
+    pause()
 
 def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_name, res_count):
     """Загрузить ресурсы решения:
@@ -1444,8 +1445,8 @@ def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_n
     settings_resources_list = list(filter(lambda x: x['source'] == SETTINGS_SOURCE, all_resources_list))
     if len(settings_resources_list):
         import_settings_resources(src_folders_list, settings_resources_list)
-
-    print("==========Импорт завершен==========")
+    log.info("==========Импорт завершен==========")
+    pause()
 
 #endregion
 #endregion
