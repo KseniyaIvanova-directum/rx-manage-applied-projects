@@ -2159,6 +2159,7 @@ distributions:
             if not os.path.exists(src_ess_folder):
                 log.error(f"Папка с исходниками ЛК {src_ess_folder} не существует.")
                 raise FileNotFoundError(f"'src_ess_folder' folder not found: '{src_ess_folder}'")
+            src_ess_folders_list.append(src_ess_folder)
         if (mode.lower() != 'todo') and (mode.lower() != 'all'):
             log.error("Режим работы указан неверно: 'todo' - ресурсы с todo, 'all' - все ресурсы.")
             raise ValueError(f"'mode' value '{mode}' incorrect: allowed values are 'todo' or 'all'.")
