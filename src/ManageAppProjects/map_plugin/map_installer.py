@@ -342,12 +342,12 @@ def repo_info(root_src, folder):
 #region work with excel.
 def create_for_localization_worksheet(workbook):
     """Создать лист excel для выгрузки ресурсов на локализацию.
-    
+
     Args:
-        workbook: книга в excel. 
+        workbook: книга в excel.
 
     Return:
-        Лист в excel-файле для выгрузки ресурсов на локализацию. 
+        Лист в excel-файле для выгрузки ресурсов на локализацию.
     """
     worksheet = workbook.active
     worksheet.title = "На локализацию"
@@ -385,9 +385,9 @@ def create_named_worksheet(workbook, worksheet_title):
     Args:
         workbook: книга в excel.
         worksheet_title: название листа.
-    
+
     Return:
-        Лист в excel-файле для выгрузки ресурсов. 
+        Лист в excel-файле для выгрузки ресурсов.
     """
     worksheet = workbook.create_sheet()
     worksheet.title = worksheet_title
@@ -407,9 +407,9 @@ def create_named_worksheet(workbook, worksheet_title):
 
 def add_style_to_header(range):
     """Применить форматирование заголовков для заданной области excel-файла.
-    
+
     Args:
-        range: область excel-файла.  
+        range: область excel-файла.
     """
     from openpyxl.styles import PatternFill, Alignment, Font
     for row in range:
@@ -421,9 +421,9 @@ def add_style_to_header(range):
 
 def add_style_to_range(range):
     """Применить форматирование для заданной области excel-файла.
-    
+
     Args:
-        range: область excel-файла.  
+        range: область excel-файла.
     """
     from openpyxl.styles import Alignment
     for row in range:
@@ -462,12 +462,12 @@ def get_resources_list_from_xls(input_file, sheet_name, res_count):
 
 #region work with files and folders.
 def find_all_settings_files(src_folders_list):
-    """Получить все json-файлы с настройками из заданной папки. 
+    """Получить все json-файлы с настройками из заданной папки.
     Настройки хранятся в подпапке .Settings в файле *.json.
-    
+
     Args:
         src_folders_list: список папок.
-    
+
     Return:
         Список файлов с настройками бизнесс-процессов.
     """
@@ -483,10 +483,10 @@ def find_all_settings_files(src_folders_list):
 def find_all_mtd_files(src_folders_list):
     """Получить все mtd-файлы из заданной папки.
     Исключить файлы из папок VersionData, так как для них не будет файлов с ресурсами.
-    
+
     Args:
         src_folders_list: список папок.
-    
+
     Return:
         Список файлов с метаданными ПЧ.
     """
@@ -501,10 +501,10 @@ def find_all_mtd_files(src_folders_list):
 def find_all_ess_resources_files(src_ess_folders_list):
     """Получить все xml-файлы с ресурсами ЛК из заданного списка папок.
     Взять только те, где есть раздел localizedStringValues, так как только в них содержатся ресурсы.
-    
+
     Args:
         src_ess_folders_list: список папок.
-    
+
     Return:
         Список файлов с ресурсами ЛК.
     """
@@ -529,12 +529,12 @@ def find_all_ess_resources_files(src_ess_folders_list):
 def find_all_src_files(src_folders_list):
     """Получить все файлы с исходниками из заданной папки.
     Взять *.cs (исключив *.g.cs) и файлы разметки отчетов *.frx
-    
+
     Args:
         src_folders_list: список папок.
-    
+
     Return:
-        Список файлов с исходниками ПЧ.  
+        Список файлов с исходниками ПЧ.
     """
     import glob
     src_files = []
@@ -548,12 +548,12 @@ def find_all_src_files(src_folders_list):
 
 def find_all_ess_src_files(src_ess_folders_list):
     """Получить все xml-файлы с исходниками ЛК из заданного списка папок.
-    
+
     Args:
         src_ess_folders_list: список папок.
-    
+
     Return:
-        Список файлов с исходниками ЛК.  
+        Список файлов с исходниками ЛК.
     """
     import glob
     src_files = []
@@ -564,45 +564,45 @@ def find_all_ess_src_files(src_ess_folders_list):
 
 def get_filename_without_ext(filename):
     """Получить имя файла без расширения.
-    
+
     Args:
         filename: полное имя файла.
-    
+
     Return:
-        Имя файла без расширения.  
+        Имя файла без расширения.
     """
     return os.path.splitext(filename)[0]
 
 def get_file_path(filename):
     """Получить путь до файла.
-    
+
     Args:
         filename: полное имя файла.
-    
+
     Return:
-        Путь до файла.  
+        Путь до файла.
     """
     return os.path.dirname(filename)
 
 def get_filename_without_ext_and_src_folder(filename):
     """Получить имя файла без пути и расширения.
-    
+
     Args:
         filename: полное имя файла.
-    
+
     Return:
-        Имя файла без пути и расширения.  
+        Имя файла без пути и расширения.
     """
     return os.path.basename(get_filename_without_ext(filename))
 
 def get_resource_filename_by_mtd_filename(filename, is_system, is_russian):
-    """Получить имя файла с ресурсами по имени mtd-файла и параметрам. 
-    
+    """Получить имя файла с ресурсами по имени mtd-файла и параметрам.
+
     Args:
         filename: полное имя файла.
         is_system: True - системные, иначе несистемные.
         is_russian: True - русские, иначе английские.
-        
+
     Return:
         Имя файла .resx.
     """
@@ -757,13 +757,13 @@ def is_date(string):
 #region work with resources.
 def get_resources_list_from_mtd_file(mtd_filename, src_list):
     """Получить все ресурсы по mtd-файлу: системные и несистемные.
-    
+
     Args:
         mtd_filename: имя файла с метаданными ПЧ.
         src_list: список с исходниками ПЧ.
-    
+
     Return:
-        Список с ресурсами из указанного файла.  
+        Список с ресурсами из указанного файла.
     """
     resources_list = get_resources_list_from_file(mtd_filename, False, src_list)
     system_resources_list = get_resources_list_from_file(mtd_filename, True, src_list)
@@ -772,14 +772,14 @@ def get_resources_list_from_mtd_file(mtd_filename, src_list):
 
 def get_resources_list_from_file(mtd_filename, is_system, src_list):
     """Получить все ресурсы по mtd-файлу: системные или несистемные.
-    
+
     Args:
         mtd_filename: файл с метаданными ПЧ.
         is_system: True - системные, иначе несистемные.
         src_list: список с исходниками ПЧ
-    
+
     Return:
-        Список с ресурсами из указанного файла.  
+        Список с ресурсами из указанного файла.
     """
     resources_list = []
     en_resources_filename = get_resource_filename_by_mtd_filename(mtd_filename, is_system, False)
@@ -820,12 +820,12 @@ def get_resources_list_from_file(mtd_filename, is_system, src_list):
 
 def find_all_resources(filename):
     """Получить ресурсы из указанного файла прикладной.
-    
+
     Args:
         filename: файл ресурсами ПЧ.
-    
+
     Return:
-        Список с ресурсами из указанного файла.  
+        Список с ресурсами из указанного файла.
     """
     import xmltodict
     import codecs
@@ -845,13 +845,13 @@ def find_all_resources(filename):
 
 def find_resource_in_file_by_code(filename, resource_code):
     """Найти ресурс в файле по указанному имени.
-    
+
     Args:
         filename: файл ресурсами ПЧ.
         resource_code: код ресурса.
-    
+
     Return:
-        Ресурс.  
+        Ресурс.
     """
     import xmltodict
     import codecs
@@ -874,12 +874,12 @@ def find_resource_in_file_by_code(filename, resource_code):
 
 def find_all_ess_resources(filename):
     """Получить ресурсы из указанного файла конфигов ЛК.
-    
+
     Args:
         filename: имя файла с ресурсами ЛК.
-    
+
     Return:
-        Список с ресурсами из указанного файла.  
+        Список с ресурсами из указанного файла.
     """
     import xmltodict
     import codecs
@@ -892,7 +892,25 @@ def find_all_ess_resources(filename):
             return []
         else:
             return resources_list
-        
+
+def get_values(data, key):
+    """Получить значения из JSON файла по ключу рекурсивно.
+    Args:
+        data: JSON объект.
+        key: Ключ искомых значений
+
+    Return:
+        Список значений.
+    """
+    if isinstance(data, list):
+        for item in data:
+            yield from get_values(item, key)
+    elif isinstance(data, dict):
+        if key in data.keys():
+            yield data[key]
+        for item in data.values():
+            yield from get_values(item, key)
+
 def get_resources_list_from_settings_file(settings_filename):
     """Получить ресурсы из настройки бизнесс-процессов.
     Args:
@@ -901,7 +919,7 @@ def get_resources_list_from_settings_file(settings_filename):
     Return:
         Список с ресурсами.
     """
-    resources_list = []   
+    resources_list = []
 
     # В файле *_properties_localization.json хранятся ресурсы свойств настроек.
     # В файле *_localization.json хранятся ресурсы из настройки схемы бизнесс процессов.
@@ -910,26 +928,25 @@ def get_resources_list_from_settings_file(settings_filename):
     import os.path
     if os.path.exists(settings_resources_filename) == False:
         return resources_list
-    import codecs 
+    import codecs
     try:
         with codecs.open(settings_properties_resources_filename, "r", encoding='utf-8') as manifest_json:
             data = " ".join(manifest_json.readlines())
             manifest_dict = json.loads(data)
-            component = manifest_dict["Name"]["ru-RU"] 
+            component = manifest_dict["Name"]["ru-RU"]
     except:
         component = ""
 
     # Получить названия секций с ресурсами из файла со схемой.
-    
+
     with codecs.open(settings_filename, "r", encoding='utf-8') as manifest_json:
         data = " ".join(manifest_json.readlines())
         manifest_dict = json.loads(data)
         shema = manifest_dict["Scheme"]["Scheme"]
 
-    import xml.etree.ElementTree as ET
-    root = ET.fromstring(shema)
-    resourse_code_list = root.findall(".//**[Name='localizationStringId']//Value")
-   
+    shema = json.loads(shema)
+    resourse_code_list = list(get_values(shema, 'PropertyExpressions'))
+    resourse_code_list = list(get_values(resourse_code_list, 'Value'))
 
     with codecs.open(settings_resources_filename, "r", encoding='utf-8-sig') as manifest_json:
         data = " ".join(manifest_json.readlines())
@@ -939,27 +956,27 @@ def get_resources_list_from_settings_file(settings_filename):
                 line = {'source': SETTINGS_SOURCE,
                        'filename': settings_resources_filename,
                         'component': component,
-                        'code': resourse_code.text,
-                        'ru_resource': manifest_dict[resourse_code.text]["ru-RU"],
-                        'en_resource': manifest_dict[resourse_code.text]["default"],
+                        'code': resourse_code,
+                        'ru_resource': manifest_dict[resourse_code]["ru-RU"],
+                        'en_resource': manifest_dict[resourse_code]["default"],
                         'is_system': False,
                         'using': settings_resources_filename,
                         'remark': ""}
                 resources_list.append(line)
             except:
                 pass
-     
+
     return resources_list
 
 def get_resources_list_from_ess_xml_file(ess_resources_filename, src_ess_list):
     """Получить ресурсы из конфига ЛК.
-    
+
     Args:
         ess_resources_filename: файл с ресурсами ЛК.
         src_ess_list: список с исходниками ЛК.
-    
+
     Return:
-        Список с ресурсами.  
+        Список с ресурсами.
     """
     resources_list = []
     all_resources_list = find_all_ess_resources(ess_resources_filename)
@@ -982,14 +999,14 @@ def get_resources_list_from_ess_xml_file(ess_resources_filename, src_ess_list):
 
 def find_ess_resource_in_list(all_resources_list, resource_code, language):
     """Получить ресурс из списка по коду на указанном языке.
-    
+
     Args:
         all_resources_list: список с ресурсами ЛК.
         resource_code: код ресурса.
         language: язык.
-    
+
     Return:
-        Словарь из ресурса на указанном языке и примечания.  
+        Словарь из ресурса на указанном языке и примечания.
     """
     remark = ''
     resource = ''
@@ -1008,12 +1025,12 @@ def find_ess_resource_in_list(all_resources_list, resource_code, language):
 def get_resource_ess_text(resource):
     """Получить текст ресурса из конфига ЛК.
     Если текст не указан - вернетсяя пустая строка.
-    
+
     Args:
         resource: ресурс из конфига ЛК.
-    
+
     Return:
-        Текст ресурса.  
+        Текст ресурса.
     """
     try:
         resource_text = resource['#text']
@@ -1023,7 +1040,7 @@ def get_resource_ess_text(resource):
 
 def get_resources_list_from_src(src_folders_list, src_ess_folders_list):
     """Получить полный список всех ресурсов из файлов решения: из ПЧ и из ЛК.
-    
+
     Args:
         src_folders_list: список папок с исходниками ПЧ.
         src_ess_folders_list: список папок с конфигами ЛК.
@@ -1057,10 +1074,10 @@ def get_resources_list_from_src(src_folders_list, src_ess_folders_list):
 # region search in sources functions.
 def get_all_src_data(src_folders_list):
     """Получить исходники прикладной из указанной папки.
-    
+
     Args:
         src_folders_list: список папок с конфигами ЛК.
-    
+
     Return:
         Список с исходниками ПЧ из указанной папки.
     """
@@ -1079,11 +1096,11 @@ def get_all_src_data(src_folders_list):
 
 def find_resource_in_src_data(src_data, resource_code):
     """Найти использование ресурса в исходниках прикладной из указанной папки.
-    
+
     Args:
         src_data: список с исходниками.
         resource_code: код ресурса.
-    
+
     Return:
         Фрагмент с использованием ресурса.
     """
@@ -1103,10 +1120,10 @@ def find_resource_in_src_data(src_data, resource_code):
 
 def get_all_ess_src_data(src_ess_folders_list):
     """Получить исходники ЛК из указанной папки.
-    
+
     Args:
         src_ess_folders_list: список папок с конфигами ЛК.
-    
+
     Return:
         Список с исходниками ЛК из указанной папки.
     """
@@ -1125,11 +1142,11 @@ def get_all_ess_src_data(src_ess_folders_list):
 
 def find_resource_in_ess_src_data(src_list, resource_code):
     """Найти использование ресурса в исходниках.
-    
+
     Args:
         src_ess_list: список с исходниками.
         resource_code: код ресурса.
-    
+
     Return:
         Место использования. Первое вхождение.
     """
@@ -1149,14 +1166,14 @@ def find_resource_in_ess_src_data(src_list, resource_code):
 
 def get_using_fragment(src_file_list, filename, str_number):
     """Найти фрагмент использования ресурса.
-    
+
     Args:
         src_file_list: файл с исходниками, разбитый на список строк.
         filename: путь до файла с исходниками.
         str_number: номер строки.
-    
+
     Return:
-        Фрагмент использования: файл с папкой, в которой он расположен (полный путь выводить не имеет смысла), номер строки, а также сама строка, 
+        Фрагмент использования: файл с папкой, в которой он расположен (полный путь выводить не имеет смысла), номер строки, а также сама строка,
         ее предшествующая и следующая без лишних пробелов.
     """
     s_path = filename.split("\\")
@@ -1164,7 +1181,7 @@ def get_using_fragment(src_file_list, filename, str_number):
     src_file_fragment = ""
     if str_number > 0:
         src_file_fragment += f"\n{src_file_list[str_number - 1].strip()}"
-    src_file_fragment += f"\n{src_file_list[str_number].strip()}" 
+    src_file_fragment += f"\n{src_file_list[str_number].strip()}"
     if str_number < len(src_file_list) - 1:
         src_file_fragment += f"\n{src_file_list[str_number + 1].strip()}"
     return f"{short_path}: {str_number + 1}\n{src_file_fragment}"
@@ -1174,7 +1191,7 @@ def replace_xml_spec_symbols(resource):
 
     Args:
         resource: текст ресурса.
-    
+
     Return:
         Текст ресурса с замененными спец.символами."""
     return resource.replace("<", "&lt;").replace(">", "&gt;")
@@ -1184,7 +1201,7 @@ def import_mtd_resources(src_folders_list, resources_list):
 
     Args:
         src_folders_list: список папок с исходниками ПЧ.
-        resources_list: список вычитанных и переведенных строк. 
+        resources_list: список вычитанных и переведенных строк.
     """
     import codecs
     # Получить все файлы с ресурсами ПЧ.
@@ -1274,7 +1291,7 @@ def import_ess_resources(src_ess_folders_list, ess_resources_list):
 
     Args:
         src_ess_folders_list: список папок с конфигами ЛК.
-        ess_resources_list: список вычитанных и переведенных строк. 
+        ess_resources_list: список вычитанных и переведенных строк.
     """
     import codecs
     files_list = find_all_ess_resources_files(src_ess_folders_list)
@@ -1330,7 +1347,7 @@ def import_settings_resources(src_settings_folders_list, settings_resources_list
 
     Args:
         src_settings_folders_list: список папок с исходниками.
-        settings_resources_list: список вычитанных и переведенных строк. 
+        settings_resources_list: список вычитанных и переведенных строк.
     """
     import codecs
     files_list = find_all_settings_files(src_settings_folders_list)
@@ -1348,7 +1365,7 @@ def import_settings_resources(src_settings_folders_list, settings_resources_list
                 if resource['new_en_resource'] is not None and resource['new_en_resource'] != resource['en_resource']:
                     is_modified = True
                     res_file_list[resource['code']]['default']=resource['new_en_resource']
-      
+
                 # Обработать русский ресурс, если его меняли.
                 if resource['new_ru_resource'] is not None and resource['new_ru_resource'] != resource['ru_resource']:
                     is_modified = True
@@ -1380,7 +1397,7 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     # На лист "На локализацию" добавить все ресурсы или только ресурсы с todo, в завиимости от варианта запуска.
     # Иcключить неиспользуемые ресурсы, но оставить системные ресурсы (так как в коде не используется),
     # операции из истории (так как в прикладном коде их нет, они подхватываются платформой),
-    # ресурсы из настроек схем бизнесс-процессов, т.к. они заданы на схеме. 
+    # ресурсы из настроек схем бизнесс-процессов, т.к. они заданы на схеме.
     for_localization_resources_list = list(filter(lambda x: x['using'] != ""
                                                   or x['is_system']
                                                   or str(x['code']).startswith("Enum_Operation")
@@ -1399,11 +1416,11 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     add_style_to_range(range)
     # На лист "Не используется" добавить все неиспользуемые ресурсы. Создавать лист, только если есть ресурсы для добавления.
     # Из списка неиспользуемых исключить:
-    #   системные ресурсы, так как в коде не используется, 
+    #   системные ресурсы, так как в коде не используется,
     #   операции из истории, так как в прикладном коде их нет, они подхватываются платформой,
-    #   ресурсы из настроек схем бизнесс-процессов, т.к. они заданы на схеме. 
-    not_used_resources_list = list(filter(lambda x: x['using'] == "" 
-                                          and not x['is_system'] 
+    #   ресурсы из настроек схем бизнесс-процессов, т.к. они заданы на схеме.
+    not_used_resources_list = list(filter(lambda x: x['using'] == ""
+                                          and not x['is_system']
                                           and not str(x['code']).startswith("Enum_Operation")
                                           and not x['source'] == SETTINGS_SOURCE, all_resources_list))
     not_used_count = len(not_used_resources_list)
@@ -1416,7 +1433,7 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
     # На лист "С анг. символами в рус." добавить те, где в русском ресурсе есть английские символы. Создавать лист, только если есть ресурсы для добавления.
     # Исключить все невычитанные. Иcключить неиспользуемые ресурсы, но оставить системные ресурсы.
     import re
-    en_in_ru_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and 
+    en_in_ru_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and
                                             not str(x['ru_resource']).lower().startswith("todo") and not str(x['en_resource']).lower().startswith("todo") and
                                             (re.search("[a-z]+", str(x['ru_resource']).lower()) is not None), all_resources_list))
     en_in_ru_count = len(en_in_ru_resources_list)
@@ -1428,7 +1445,7 @@ def export_resources(src_folders_list, src_ess_folders_list, is_todo, output_fil
         add_style_to_range(range)
     # На лист "С рус. символами в анг." добавить те, где в английском ресурсе есть русские символы. Создавать лист, только если есть ресурсы для добавления.
     # Исключить все невычитанные. Иcключить неиспользуемые ресурсы, но оставить системные ресурсы.
-    ru_in_en_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and 
+    ru_in_en_resources_list = list(filter(lambda x: (x['using'] != "" or x['is_system']) and
                                             not str(x['ru_resource']).lower().startswith("todo") and not str(x['en_resource']).lower().startswith("todo") and
                                             (re.search("[а-я]+", str(x['en_resource']).lower()) is not None), all_resources_list))
     ru_in_en_count = len(ru_in_en_resources_list)
@@ -1505,7 +1522,7 @@ def import_resources(src_folders_list, src_ess_folders_list, input_file, sheet_n
         src_ess_folders_list: список папок с конфигами ЛК.
         input_file: файл xlsx с вычитанными и переведенными ресурсами для загрузки.
         sheet_name: имя листа xlsx файла с ресурсами.
-        res_count: количество строк на листе. 
+        res_count: количество строк на листе.
     """
     print("==========Импорт запущен==========")
     log.info("Анализ")
