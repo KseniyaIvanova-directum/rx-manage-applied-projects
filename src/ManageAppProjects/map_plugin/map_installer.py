@@ -943,10 +943,15 @@ def get_resources_list_from_settings_file(settings_filename):
         data = " ".join(manifest_json.readlines())
         manifest_dict = json.loads(data)
         shema = manifest_dict["Scheme"]["Scheme"]
-
-    shema = json.loads(shema)
-    resourse_code_list = list(get_values(shema, 'PropertyExpressions'))
-    resourse_code_list = list(get_values(resourse_code_list, 'Value'))
+    if shema.startswith("<?xml version="):
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(shema)
+        resourse_code_list = root.findall(".//**[Name='localizationStringId']//Value")
+        resourse_code_list = list(map(lambda x: x.text, resourse_code_list))
+    else:
+        shema = json.loads(shema)
+        resourse_code_list = list(get_values(shema, 'PropertyExpressions'))
+        resourse_code_list = list(get_values(resourse_code_list, 'Value'))
 
     with codecs.open(settings_resources_filename, "r", encoding='utf-8-sig') as manifest_json:
         data = " ".join(manifest_json.readlines())
@@ -954,7 +959,7 @@ def get_resources_list_from_settings_file(settings_filename):
         for resourse_code in resourse_code_list:
             try:
                 line = {'source': SETTINGS_SOURCE,
-                       'filename': settings_resources_filename,
+                        'filename': settings_resources_filename,
                         'component': component,
                         'code': resourse_code,
                         'ru_resource': manifest_dict[resourse_code]["ru-RU"],
